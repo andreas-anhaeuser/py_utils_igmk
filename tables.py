@@ -1,5 +1,5 @@
-#! /usr/bin/env python
-"""Handle text tables.
+#!/usr/bin/python
+"""String table utilities.
 
 Author
 ------
