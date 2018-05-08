@@ -1,4 +1,7 @@
 #!/usr/bin/python
+"""Scalar function minimization using Nelder-Mead algorithm.
+
+"""
 
 from copy import deepcopy as copy
 import numpy as np
@@ -11,7 +14,7 @@ _sigma = 0.5    # shrinking factor
 _fatol = 1e-4   # function difference tolerance
 _xatol = 1e-4   # parameter difference tolerance
 _maxiter = 200  # maximum number of iterations
-_maxfeval = 400 # maximum number of function evaluation
+_maxfev = 400 # maximum number of function evaluation
 
 # simplex : ndarray, length N
 # vertex : ndarray, shape (N+1) x N
@@ -23,13 +26,15 @@ def minimize_nelder_mead(
         fun,
         x0,
         args=(),
-        callback_function=None,
-        x0_uncert=None,
-        initial_simplex=None,
-        fatol=None,
-        xatol=None,
+        callback=None,
         maxiter=None,
-        maxfeval=None,
+        maxfev=None,
+        disp=False,
+        return_all=False,
+        initial_simplex=None,
+        xatol=None,
+        fatol=None,
+        x0_uncert=None,
     ):
     """
 
@@ -52,8 +57,8 @@ def minimize_nelder_mead(
         xatol = _xatol 
     if maxiter is None:
         maxiter = _maxiter
-    if maxfeval is None:
-        maxfeval = _maxfeval
+    if maxfev is None:
+        maxfev = _maxfev
 
     if x0_uncert is None:
         x0_uncert = make_up_uncertainties(x0)
@@ -66,7 +71,7 @@ def minimize_nelder_mead(
     ###################################################
     options = {
             'maxiter' : maxiter,
-            'maxfeval' : maxfeval,
+            'maxfev' : maxfev,
             'fatol' : fatol,
             'xatol' : xatol,
             }
@@ -170,8 +175,8 @@ def minimize_nelder_mead(
             simplex[m_worst] = x_reflected
             record['action'].append(_REFLECT)
 
-        if callback_function is not None:
-            callback_function(record)
+        if callback is not None:
+            callback(record)
 
     ###################################################
     # PREPARE RECORD                                  #
@@ -204,8 +209,8 @@ def termination_reached(record, options):
     if Niter > options['maxiter']:
         return True
 
-    # maxfeval
-    if Nfeval > options['maxfeval']:
+    # maxfev
+    if Nfeval > options['maxfev']:
         return True
 
     # fatol
