@@ -1,10 +1,56 @@
 #!/usr/bin/python
-"""Scalar function minimization using Nelder-Mead algorithm.
+"""Minimization of scalar functions using Nelder-Mead algorithm.
 
+    This solver is intended to be an improvement of the Nelder-Mead function
+    in `scipy.optimize.minizme`.
+
+
+    Improvements are:
+    =================
+    - The output now also includes the history of the function values on the
+      vertices of each iteration step.
+    - The codes has been completely re-written in order to make it more
+      readable.
+    - Documentation has been added.
+    - Magic numbers are placed at the start of the script.
+
+
+    Terms
+    =====
+        Simplex
+        -------
+        A simplex is the higher-dimensional generalisation of a triangle on a
+        plane or a tetrahedron in space. It exists in N-dimensional
+        (hyper-)space and has (N+1) "corners".
+
+        Vertex
+        ------
+        A "corner" of a simplex.
+
+        Centroid
+        --------
+        The arithmetic mean of a simplex's vertices (i. e. its "center" point).
+
+
+    Method
+    ======
+    The algorithm tries to minimize a scale-valued function in N-dimensional
+    argument space. An N-dim simplex is initialized an the iteratively moved
+    and reshaped depending on the function values on its vertices. If
+    successful, this will eventually lead to a contraction of the simplex
+    around the function minimum. For details see docstring of the main function.
+
+
+    Author
+    ======
+    Andreas Anhaeuser (AA)
+    University of Cologne
+    <andreas.anhaeuser@posteo.net>
 """
 
 from copy import deepcopy as copy
 import numpy as np
+from scipy.optimize import OptimizeResult
 
 _alpha = 1.     # reflection factor
 _gamma = 2.     # expansion factor
@@ -14,7 +60,7 @@ _sigma = 0.5    # shrinking factor
 _fatol = 1e-4   # function difference tolerance
 _xatol = 1e-4   # parameter difference tolerance
 _maxiter = 200  # maximum number of iterations
-_maxfev = 400 # maximum number of function evaluation
+_maxfev = 400   # maximum number of function evaluation
 
 # simplex : ndarray, length N
 # vertex : ndarray, shape (N+1) x N
@@ -36,13 +82,21 @@ def minimize_nelder_mead(
         fatol=None,
         x0_uncert=None,
     ):
-    """
+    """Return a dict.
 
         Parameters
         ----------
+        fun : callable
+            Function that is to be minimized.
+        x0 : array
+            Initial guess of the parameters to be optimized.
+        args : tuble, optional
+            additional parameters passed
+        
 
         Returns
         -------
+        scipy.optimize.OptimizeResult
 
         History
         -------
@@ -107,7 +161,9 @@ def minimize_nelder_mead(
     simplex = initial_simplex
 
     while not termination_reached(record, options):
-        # ========== evaluate  =========================== #
+        ###################################################
+        # EVALUATE                                        #
+        ###################################################
         fun_values = F(simplex)
 
         # best
@@ -127,7 +183,9 @@ def minimize_nelder_mead(
         x_reflected = get_reflected_vertex(x_worst, x_centroid)
         f_reflected = f(x_reflected)
 
-        # ========== record  ============================= #
+        ###################################################
+        # RECORD                                          #
+        ###################################################
         record['all_simplices'].append(copy(simplex))
         record['best_vertices'].append(copy(x_best))
         record['worst_vertices'].append(copy(x_worst))
@@ -179,7 +237,7 @@ def minimize_nelder_mead(
             callback(record)
 
     ###################################################
-    # PREPARE RECORD                                  #
+    # CREATE OptimizeResult OBJECT                    #
     ###################################################
     # list -> array
     for key in record.keys():
@@ -189,46 +247,13 @@ def minimize_nelder_mead(
 
     record['Nfeval'] = len(table['fun_values'])
 
+    record['success'] = convergence_reached(record, options)
+
     return record
 
 ###################################################
 # MISC                                            #
 ###################################################
-def termination_reached(record, options):
-    all_simplices = record['all_simplices']
-    all_fun_values = record['all_fun_values']
-    table = record['lookup_table']
-
-    Niter = len(all_simplices)
-    Nfeval = len(table['fun_values'])
-
-    if Niter < 2:
-        return False
-
-    # maxiter
-    if Niter > options['maxiter']:
-        return True
-
-    # maxfev
-    if Nfeval > options['maxfev']:
-        return True
-
-    # fatol
-    fatol = options['fatol']
-    fun_values = all_fun_values[-1]
-    span = np.ptp(fun_values)
-    if span < fatol:
-        return True
-
-    # xatol
-    xatol = options['xatol']
-    simplex = all_simplices[-1]
-    spans = np.ptp(simplex, 0)
-    if np.sum(spans >= xatol) == 0:
-        return True
-
-    return False
-
 def get_initial_simplex(x0, x0_uncert):
     """Return a (N+1 x N)-array."""
     # input check
@@ -261,6 +286,55 @@ def make_up_uncertainties(x0):
     unc = 0.1 * np.abs(x0) 
     unc[unc==0] = 0.1
     return unc
+
+###################################################
+# TERMINATION CRITERIA                            #
+###################################################
+def termination_reached(record, options):
+    iteration_criterion = iteration_limit_reached(record, options)
+    convergence_criterion = convergence_reached(record, options)
+    terminate = iteration_criterion or convergence_criterion
+    return terminate
+
+def iteration_limit_reached(record, options):
+    all_simplices = record['all_simplices']
+    table = record['lookup_table']
+
+    Niter = len(all_simplices)
+    Nfeval = len(table['fun_values'])
+
+    if Niter < 2:
+        return False
+
+    # maxiter
+    if Niter > options['maxiter']:
+        return True
+
+    # maxfev
+    if Nfeval > options['maxfev']:
+        return True
+
+    return False
+
+def convergence_reached(record, options):
+    """Return a bool."""
+    # fatol
+    all_fun_values = record['all_fun_values']
+    fatol = options['fatol']
+    fun_values = all_fun_values[-1]
+    span = np.ptp(fun_values)
+    if span < fatol:
+        return True
+
+    # xatol
+    all_simplices = record['all_simplices']
+    xatol = options['xatol']
+    simplex = all_simplices[-1]
+    spans = np.ptp(simplex, 0)
+    if np.sum(spans >= xatol) == 0:
+        return True
+
+    return False
 
 ###################################################
 # MANIPULATE SIMPLEX                              #
