@@ -7,7 +7,32 @@
     Institute for Geophysics and Meteorology
     University of Cologne, Germany
 """
+import numpy as np
 
+###################################################
+# COLORS                                          #
+###################################################
+# foreground colors
+_ENDC = '\033[0m'
+_BOLD = '\033[1m'
+_BLUE = '\033[94m'
+_YELLOW = '\033[93m'
+_RED = '\033[91m'
+_GREEN = '\033[92m'
+
+# background colors
+_BG_BLACK = '\033[40m'
+_BG_RED = '\033[41m'
+_BG_GREEN = '\033[42m'
+_BG_ORANGE = '\033[43m'
+_BG_BLUE = '\033[44m'
+_BG_MAGENTA = '\033[45m'
+_BG_CYAN = '\033[46m'
+_BG_GREY = '\033[47m'
+
+###################################################
+# HUMAN READABLE FORMATS                          #
+###################################################
 def human_format(num, digits=2, sep='', mode='prefix', type='float'):
     """Convert large and small numbers to human with SI prefixes.
     
@@ -117,3 +142,112 @@ def human_format(num, digits=2, sep='', mode='prefix', type='float'):
         prefix = p[-mag]
 
     return fmt % (num, prefix)
+
+def percentage_string(fraction, sep=' '):
+    """Return a str with a sensible number of digits.
+        
+        The closer to 0 or 100%, the more the number of digits is increased.
+
+        Parameters
+        ----------
+        fraction : float
+            usually, but not necessarily, between 0 and 1
+        sep : str
+            separator between number and '%' sign in the output
+
+        Returns
+        -------
+        str
+            something like '0.024 %', '1.2 %', '63 %' or '99.9936 %'
+    """
+    pc = fraction * 100
+
+    # outside [0, 100%] : zero digits after .
+    if pc <= 0:
+        Ndig = 0
+    elif pc >= 100:
+        Ndig = 0
+
+    # regular cases
+    elif pc < 10:
+        Ndig = 1 - np.floor(np.log10(pc))
+    elif pc > 90:
+        Ndig = 1 - np.floor(np.log10(100 - pc))
+    else:
+        Ndig = 0
+
+    Ndig = min(6, int(Ndig))
+
+    fmt = '%1.' + str(Ndig) + 'f' + sep + '%%'
+    return (fmt % pc)
+
+###################################################
+# PROGRESS BAR                                    #
+###################################################
+def progress_bar(fraction, length=79, fillcolor='', bgcolor=''):
+    """*Helper function. Return a nice progress bar as str. No '\n'."""
+    beg = _BOLD + u'\u2595' + _ENDC
+    end = _BOLD + u'\u258f' + _ENDC
+
+    Nbar = length - 2
+
+    # fraction > 1
+    if fraction > 1:
+        left_inner = progress_bar_inner(fraction=1, length=Nbar,
+                fillcolor=fillcolor, bgcolor=bgcolor)
+        right_inner = progress_bar_inner(fraction=fraction-1, length=Nbar,
+                fillcolor=_YELLOW, bgcolor=bgcolor)
+        line = beg + left_inner + right_inner
+        
+    # fraction < 0
+    elif fraction < 0:
+        return progress_bar(-fraction, length=length, fillcolor=_YELLOW)
+
+    # 0 <= fraction <= 1 (regular case)
+    else:
+        filling = progress_bar_inner(fraction, length=Nbar,
+                fillcolor=fillcolor, bgcolor=bgcolor)
+        line = beg + filling + end 
+
+    return line
+
+def progress_bar_inner(fraction, length=77, fillcolor='', bgcolor=''):
+    """*Helper function."""
+    # N : integers
+    # F : float
+    # full : number of (entirely) filled columns
+    # blank : number of (entirely) clear columns
+    Nbar = length
+
+    Ffull = fraction * Nbar
+    Nfull = int(Ffull)
+    Nblank = Nbar - Nfull - 1
+    fractional_part = Ffull - Nfull
+    Neighths = int(round(fractional_part * 8))
+
+    block_full = get_frac_block(8)
+    block_frac = get_frac_block(Neighths)
+
+    # special case
+    if Nfull == Nbar and fraction <= 1:
+        block_frac = ''
+
+    filling = bgcolor + fillcolor + \
+            Nfull * block_full + \
+            block_frac + \
+            Nblank * ' ' + \
+            _ENDC
+    return filling
+
+def get_frac_block(Neighths):
+    if Neighths == 0:
+        return ' '
+    assert 0 <= Neighths <= 8
+
+    pos0 = 0x2588   # full block
+
+    # account for every missing eighth:
+    inc = 8 - Neighths
+    pos = pos0 + inc    # e. g. \0x259a for 5 eighths
+
+    return unichr(pos)

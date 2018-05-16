@@ -19,7 +19,7 @@ import os
 import datetime as dt
 import numpy as np
 
-from string_utils import human_format
+import string_utils
 
 ###################################################
 # CONSTANTS                                       #
@@ -34,28 +34,18 @@ _tfmt_hours = '%d %H:%M:%S'
 _tfmt_minutes = '%d %H:%M:%S'
 
 # foreground colors
-_ENDC = '\033[0m'
-_BOLD = '\033[1m'
-_BLUE = '\033[94m'
-_YELLOW = '\033[93m'
-_RED = '\033[91m'
-_GREEN = '\033[92m'
-
-# background colors
-_BG_BLACK = '\033[40m'
-_BG_RED = '\033[41m'
-_BG_GREEN = '\033[42m'
-_BG_ORANGE = '\033[43m'
-_BG_BLUE = '\033[44m'
-_BG_MAGENTA = '\033[45m'
-_BG_CYAN = '\033[46m'
-_BG_GREY = '\033[47m'
+_ENDC = string_utils._ENDC
+_BOLD = string_utils._BOLD
+_BLUE = string_utils._BLUE
+_YELLOW = string_utils._YELLOW
+_RED = string_utils._RED
+_GREEN = string_utils._GREEN
 
 # motions
 _UPWARD = '\033[1A'
 _DOWNWARD = '\033[1B'
 _FORWARD = '\033[1C'
-_BACKWARD = '\033[1C'
+_BACKWARD = '\033[1D'
 
 _CLRSCR = '\033[2J'     # clear screen, move to (0, 0)
 _CLEARLINE  = '\033[K'  # erase to end of line
@@ -176,7 +166,7 @@ class Chronometer(object):
         if x < 1:
             x *= 24
             units = 'd'
-        return '%s loops/%s' % (human_format(x), units)
+        return '%s loops/%s' % (string_utils.human_format(x), units)
 
     def inverse_speed_string(self):
         speed = self.speed()
@@ -352,15 +342,15 @@ class Chronometer(object):
         # fraction line
         words[0] = 'Fraction:'
         words[1] = '100 %'
-        words[2] = percentage_string(self.fraction_done())
-        words[3] = percentage_string(self.fraction_todo())
+        words[2] = string_utils.percentage_string(self.fraction_done())
+        words[3] = string_utils.percentage_string(self.fraction_todo())
         line = self.build_line(words, colors=_colors)
         text = text + line
 
         # bar
         bar_width = sum(_col_width[1:])
         fraction_done = self.fraction_done()
-        bar = progress_bar(fraction_done, bar_width)
+        bar = string_utils.progress_bar(fraction_done, bar_width)
         text = text + ' ' * _col_width[0] + bar + '\n'
 
         # usermessage
@@ -517,92 +507,6 @@ def sound(length, freq=1000):
     os.system('play --no-show-progress --null --channels 1 synth %s sine %f' %\
             (length, freq))
 
-def get_frac_block(Neighths):
-    if Neighths == 0:
-        return ' '
-    assert 0 <= Neighths <= 8
-
-    pos0 = 0x2588   # full block
-
-    # account for every missing eighth:
-    inc = 8 - Neighths
-    pos = pos0 + inc    # e. g. \0x259a for 5 eighths
-
-    return unichr(pos)
-
-def progress_bar_inner(fraction, length=77, fillcolor='', bgcolor=''):
-    """*Helper function."""
-    # N : integers
-    # F : float
-    # full : number of (entirely) filled columns
-    # blank : number of (entirely) clear columns
-    Nbar = length
-
-    Ffull = fraction * Nbar
-    Nfull = int(Ffull)
-    Nblank = Nbar - Nfull - 1
-    fractional_part = Ffull - Nfull
-    Neighths = int(round(fractional_part * 8))
-
-    block_full = get_frac_block(8)
-    block_frac = get_frac_block(Neighths)
-
-    # special case
-    if Nfull == Nbar and fraction <= 1:
-        block_frac = ''
-
-    filling = bgcolor + fillcolor + \
-            Nfull * block_full + \
-            block_frac + \
-            Nblank * ' ' + \
-            _ENDC
-    return filling
-
-def progress_bar(fraction, length=79, fillcolor='', bgcolor=''):
-    """*Helper function. Return a nice progress bar as str. No '\n'."""
-    beg = _BOLD + u'\u2595' + _ENDC
-    end = _BOLD + u'\u258f' + _ENDC
-
-    Nbar = length - 2
-
-    # fraction > 1
-    if fraction > 1:
-        left_inner = progress_bar_inner(fraction=1, length=Nbar,
-                fillcolor=fillcolor, bgcolor=bgcolor)
-        right_inner = progress_bar_inner(fraction=fraction-1, length=Nbar,
-                fillcolor=_YELLOW, bgcolor=bgcolor)
-        line = beg + left_inner + right_inner
-        
-    # fraction < 0
-    elif fraction < 0:
-        return progress_bar(-fraction, length=length, fillcolor=_YELLOW)
-
-    # 0 <= fraction <= 1 (regular case)
-    else:
-        filling = progress_bar_inner(fraction, length=Nbar,
-                fillcolor=fillcolor, bgcolor=bgcolor)
-        line = beg + filling + end 
-
-    return line
-
-def percentage_string(fraction):
-    pc = fraction * 100
-    if pc <= 0:
-        Ndig = 0
-    elif pc >= 100:
-        Ndig = 0
-    elif pc < 10:
-        Ndig = 1 - np.floor(np.log10(pc))
-    elif pc > 90:
-        Ndig = 1 - np.floor(np.log10(100 - pc))
-    else:
-        Ndig = 0
-
-    Ndig = min(6, int(Ndig))
-
-    fmt = '%1.' + str(Ndig) + 'f %%'
-    return (fmt % pc)
-
 def time_string(x):
     """Convert timedelta to str.
 
@@ -679,7 +583,7 @@ def short_time_string(seconds, sep=''):
         if abs(x) > 24:
             x /= 24
             units = 'd'
-    return '%s%s' % (human_format(x, sep=sep), units)
+    return '%s%s' % (string_utils.human_format(x, sep=sep), units)
 
 def short_time_string_no_frac(seconds, digits=2, sep=''):
     x = int(np.round(seconds))
@@ -722,22 +626,22 @@ def count_string(count):
 if 1 and __name__ == '__main__':
     N = 2**16
     K = 10
-    Nchrono = K * N * 8/10
-    chrono = Chronometer(Nchrono, header='Chronometer')
-    for k in range(K):
-        chrono.issue('loop %i' % k)
-        for n in range(N):
-            chrono.loop()
-            for i in range(1):
-                for j in range(1):
-                    chrono.show()
 
-                    np.cos(np.cos(np.cos(1)))
+    for case in (0, 1):
+        if case == 0:
+            Nchrono = K * N
+            header = 'Chronometer'
+        elif case == 1:
+            Nchrono = K * N * 8/10
+            header = 'Chronometer (with wrong estimate of total loops)'
+
+        chrono = Chronometer(Nchrono, header=header)
+        for k in range(K):
+            chrono.issue('loop %i' % k)
+            for n in range(N):
+                chrono.loop()
+                chrono.show()
+
+                np.cos(np.cos(np.cos(1)))
                 
-
-    chrono.resumee('Done')
-
-if 1 and __name__ == '__main__':
-    print short_time_string_no_frac(588888)
-
-
+        chrono.resumee('Done')
