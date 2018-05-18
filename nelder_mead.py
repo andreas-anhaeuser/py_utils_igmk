@@ -4,6 +4,10 @@
     This solver is intended to be an improvement of the Nelder-Mead function
     in `scipy.optimize.minizme`.
 
+    Todo
+    ====
+    add max_time
+
 
     Improvements are:
     =================
@@ -48,8 +52,11 @@
 """
 
 from copy import deepcopy as copy
+import datetime as dt
 import numpy as np
 from scipy.optimize import OptimizeResult
+
+import nelder_mead_messages as messages
 
 _alpha = 1.     # reflection factor
 _gamma = 2.     # expansion factor
@@ -60,6 +67,7 @@ _fatol = 1e-4   # function difference tolerance
 _xatol = 1e-4   # parameter difference tolerance
 _maxiter = 200  # maximum number of iterations
 _maxfev = 400   # maximum number of function evaluation
+_maxtime_sec = 5 * 60   # maximum real time to use
 
 # simplex : ndarray, length N
 # vertex : ndarray, shape (N+1) x N
@@ -67,6 +75,15 @@ _maxfev = 400   # maximum number of function evaluation
 ###################################################
 # MAIN                                            #
 ###################################################
+def minimize(fun, x0, args=(), method='nelder-mead', jac=None, hess=None,
+        hessp=None, bounds=None, constraints=(), tol=None, callback=None,
+        options=None):
+    if method.lower() != 'nelder-mead':
+        raise NotImplementedError()
+    
+    return minimize_nelder_mead(fun, x0, args=args, callback=callback,
+            **options)
+
 def minimize_nelder_mead(
         fun,
         x0,
@@ -74,6 +91,7 @@ def minimize_nelder_mead(
         callback=None,
         maxiter=None,
         maxfev=None,
+        maxtime_sec=None,
         disp=False,
         return_all=False,
         initial_simplex=None,
@@ -81,6 +99,11 @@ def minimize_nelder_mead(
         fatol=None,
         adaptive=False,
         x0_uncert=None,
+        alpha=_alpha,
+        gamma=_gamma,
+        rho=_rho,
+        sigma=_sigma,
+        parameter_names=None,
     ):
     """Return a dict.
 
@@ -104,6 +127,8 @@ def minimize_nelder_mead(
             Maximum number of iterations.
         maxfev : int, optional
             Maximum number of function evaluations.
+        maxtime_sec : int, optional
+            Maximum number of seconds to use.
         disp : bool, optional
             Print convergence messages. Default: False
         return_all : bool, optional
@@ -144,11 +169,13 @@ def minimize_nelder_mead(
     if fatol is None:
         fatol = _fatol
     if xatol is None:
-        xatol = _xatol 
+        xatol = _xatol * np.ones_like(x0)
     if maxiter is None:
         maxiter = _maxiter
     if maxfev is None:
         maxfev = _maxfev
+    if maxtime_sec is None:
+        maxtime_sec = _maxtime_sec
 
     if x0_uncert is None:
         x0_uncert = make_up_uncertainties(x0)
@@ -159,21 +186,34 @@ def minimize_nelder_mead(
     if adaptive:
         raise NotImplementedError('Adaptive parameters not implemented. ' + 
                 'Set `adaptive` to False.')
+
+    ###################################################
+    # CHECKS                                          #
+    ###################################################
+    if any(x0_uncert==0):
+        raise ValueError('Uncertaities must not be 0.')
     
     ###################################################
     # INITIALIZE                                      #
     ###################################################
     options = {
+            'Nparam' : len(x0),
             'maxiter' : maxiter,
             'maxfev' : maxfev,
+            'maxtime' : dt.timedelta(seconds=maxtime_sec),
             'fatol' : fatol,
             'xatol' : xatol,
+            'alpha' : alpha,
+            'gamma' : gamma,
+            'rho' : rho,
+            'sigma' : sigma,
             }
 
     M, N = np.shape(initial_simplex)
     table = initialize_lookup_table(initial_simplex[0])
     record = OptimizeResult(
             {
+            'time_beg' : dt.datetime.now(),
             'all_simplices' : [],
             'best_vertices' : [],
             'worst_vertices' : [],
@@ -229,6 +269,25 @@ def minimize_nelder_mead(
         record['all_fun_values'].append(copy(fun_values))
         record['best_fun_values'].append(copy(f_best))
         record['worst_fun_values'].append(copy(f_worst))
+        record['x0'] = x0
+        if x0_uncert is not None:
+            record['x0_unc'] = x0_uncert
+        else:
+            record['x0_unc'] = np.ptp(initial_simplex, 0)
+        record['f0'] = get_function_value(x0, fun, args, table)
+        if 'f0_unc' not in record.keys():
+            record['f0_unc'] = f_worst - f_best
+
+        if parameter_names is None:
+            parameter_names = ['parameter %i' % n for n in range(N)]
+        record['parameter_names'] = parameter_names
+        
+        ###################################################
+        # DISPLAY                                         #
+        ###################################################
+        if disp:
+            update_record(record, options)
+            messages.display_intermediate_message(record, options)
 
         ###################################################
         # TERMINATE                                       #
@@ -243,14 +302,16 @@ def minimize_nelder_mead(
         x_centroid = get_centroid_vertex(simplex, m_worst)
 
         # reflected
-        x_reflected = get_reflected_vertex(x_worst, x_centroid)
+        x_reflected = get_reflected_vertex(x_worst, x_centroid,
+                options['alpha'])
         f_reflected = f(x_reflected)
 
         # check quality of reflected vertex
         if f_reflected < f_best:
             # x_reflected is best
             # -> try expansion
-            x_expanded = get_expanded_vertex(x_reflected, x_centroid)
+            x_expanded = get_expanded_vertex(x_reflected, x_centroid,
+                    options['gamma'])
             f_expanded = f(x_expanded)
             if f_expanded < f_reflected:
                 # expanded is better
@@ -264,7 +325,8 @@ def minimize_nelder_mead(
         elif f_reflected > f_worst:
             # x_reflected is worst
             # -> try contraction
-            x_contracted = get_contracted_vertex(x_worst, x_centroid)
+            x_contracted = get_contracted_vertex(x_worst, x_centroid,
+                    options['rho'])
             f_contracted = f(x_contracted)
             if f_contracted < f_worst:
                 # contracted is better
@@ -274,7 +336,8 @@ def minimize_nelder_mead(
             else:
                 # contracted is even worse (this can happen close to minima)
                 # -> shrink
-                simplex = get_shrunk_simplex(simplex, x_centroid, m_best)
+                simplex = get_shrunk_simplex(simplex, x_centroid, m_best,
+                        options['sigma'])
                 record['action'].append(_SHRINK)
 
         else:
@@ -291,188 +354,34 @@ def minimize_nelder_mead(
     ###################################################
     # CREATE OptimizeResult OBJECT                    #
     ###################################################
+    record = update_record(record, options)
+
     # list -> array
     for key in record.keys():
         if key in ['lookup_table']:
             continue
         record[key] = np.array(record[key])
-
-    record['Nfeval'] = len(table['fun_values'])
-    record['Niter'] = len(record['all_simplices'])
-
-    record['x0'] = x0
-    if x0_uncert is not None:
-        record['x0_uncert'] = x0_uncert
-    else:
-        record['x0_uncert'] = np.ptp(initial_simplex, 0)
-    record['f0'] = get_function_value(x0, fun, args, table)
-    record['x'] = x_best
-    record['f'] = f_best
     record['success'] = convergence_reached(record, options)
-    record['message'] = get_termination_message(record, options)
-
-    ###################################################
-    # DISP                                            #
-    ###################################################
-    if disp:
-        display_termination_message(record)
+    record['message'] = messages.get_termination_message(record, options)
 
     return record
-
-###################################################
-# MISC                                            #
-###################################################
-def get_initial_simplex(x0, x0_uncert):
-    """Return a (N+1 x N)-array."""
-    # input check
-    shape = np.shape(x0)
-    assert len(shape) == 1
-    assert np.shape(x0_uncert) == shape
-
-    # initialize
-    N = shape[0]
-    simplex = np.nan * np.zeros((N+1, N))
-
-    # ========== create vertices  ======================== #
-    for n in range(-1, N):
-        vertex = 1. * copy(x0)
-
-        # manipulate n-th coordinate
-        if n >= 0:
-            vertex[n] += 0.5 * x0_uncert[n]
-
-        # add vertex to simplex
-        simplex[n] = vertex
-    # ==================================================== #
-
-    # output check
-    assert np.sum(np.isnan(simplex)) == 0
-
-    return simplex
-
-def make_up_uncertainties(x0):
-    unc = 0.1 * np.abs(x0) 
-    unc[unc==0] = 0.1
-    return unc
-
-###################################################
-# TERMINATION                                     #
-###################################################
-def display_termination_message(record, options=None):
-    message = 'Succes                  : %s\n' % record['success'] + \
-              'Terminatation reason    : %s\n' % record['message'] + \
-              'Result                  : %s\n' % record['x'] + \
-              '- uncertainty           : %s\n' % parameter_uncertainty(record,
-                                                        options) + \
-              'Function value (result) : %f\n' % record['f'] + \
-              '- uncertainty           : %f\n' % function_uncertainty(record, 
-                                                        options) + \
-              'Ititial guess           : %s\n' % record['x0'] + \
-              '- uncertainty           : %s\n' % record['x0_uncert'] + \
-              'Ititial function value  : %f\n' % record['f0'] + \
-              'Iterations              : %i\n' % record['Niter'] + \
-              'Function evaluations    : %i\n' % record['Nfeval'] + \
-              ''
-
-    print(message)
-
-def get_termination_message(record, options):
-    """Return a str."""
-    # convergence
-    if convergence_reached(record, options):
-        return 'Convergence reached.'
-    
-    # iteration limit
-    itlim, message = iteration_limit_reachead(record, options)
-    if itlim:
-        return message
-
-    # other
-    return 'Termination reason unknown.'
-
-def termination_reached(record, options):
-    """Return a bool."""
-    iteration_criterion = iteration_limit_reached(record, options)[0]
-    convergence_criterion = convergence_reached(record, options)
-    terminate = iteration_criterion or convergence_criterion
-    return terminate
-
-def iteration_limit_reached(record, options):
-    """Return (bool, str)."""
-    all_simplices = record['all_simplices']
-    table = record['lookup_table']
-
-    Niter = len(all_simplices)
-    Nfeval = len(table['fun_values'])
-
-    if Niter < 2:
-        return False, ''
-
-    # maxiter
-    if Niter > options['maxiter']:
-        return True, 'Maximum number of iterations reached.'
-
-    # maxfev
-    if Nfeval > options['maxfev']:
-        return True, 'Maximum number of function evaluations reached.'
-
-    return False, ''
-
-def convergence_reached(record, options):
-    """Return a bool."""
-    # fatol
-    span = function_uncertainty(record, options)
-    fatol = options['fatol']
-    if span < fatol:
-        return True
-
-    # xatol
-    spans = parameter_uncertainty(record, options)
-    xatol = options['xatol']
-    if np.sum(spans >= xatol) == 0:
-        return True
-
-    return False
-
-def function_uncertainty(record, options):
-    """Return a float.
-
-        Return maximum difference in function values of all points of the last
-        two simplices. Return infinity if history is shorter than 2.
-    """
-    last_fun_values = record['all_fun_values'][-2:]
-
-    # history too short:
-    if len(last_fun_values) < 2:
-        return np.inf
-
-    return np.ptp(last_fun_values)
-
-def parameter_uncertainty(record, options):
-    """Return an array of shape (N,).
-
-        Return maximum difference in parameter values of all points of the last
-        two simplices. Return infinity if history is shorter than 2.
-    """
-    all_simplices = record['all_simplices']
-    K, M, N = np.shape(all_simplices)
-
-    # history too short:
-    if K < 2:
-        return np.ones(N) * np.inf
-
-    # retrieve and reshape last two simplices
-    last_simplices = np.array(all_simplices[-2:])
-    last_simplices_reshaped = last_simplices.reshape((M*2, N))
-
-    # return maximum differences
-    return np.ptp(last_simplices_reshaped, 0)
 
 ###################################################
 # MANIPULATE SIMPLEX                              #
 ###################################################
 def get_centroid_vertex(simplex, exclude_index):
-    """Return a vertex."""
+    """Return a vertex.
+
+        Parameters
+        ----------
+        simplex : array of shape (N + 1, N)
+        exclude_index : int (0...N)
+            index of the vertex that is not taken into account
+
+        Returns
+        -------
+        centroid : array of shape (N,)
+    """
     # ========== input check  ============================ #
     shape = np.shape(simplex)
     assert len(shape) == 2
@@ -481,7 +390,7 @@ def get_centroid_vertex(simplex, exclude_index):
     assert exclude_index < M
     # ==================================================== #
 
-    # exclude
+    # exclude one vertex
     m = exclude_index
     vertices = np.concatenate((simplex[:m], simplex[m+1:]), 0)
 
@@ -489,23 +398,73 @@ def get_centroid_vertex(simplex, exclude_index):
     centroid = np.mean(vertices, 0)
     return centroid
 
-def get_reflected_vertex(vertex, centroid):
-    """Return a vertex."""
-    assert _alpha > 0
-    return centroid + _alpha * (centroid - vertex)
+def get_reflected_vertex(vertex, centroid, alpha):
+    """Return a vertex.
 
-def get_expanded_vertex(vertex, centroid):
-    """Return a vertex."""
-    assert _gamma > 1
-    return centroid + _gamma * (vertex - centroid)
+        Parameters
+        ----------
+        vertex : array of shape (N,)
+        centroid : array of shape (N,)
+        alpha: float
+            reflection factor (1 for a 'true' reflection)
 
-def get_contracted_vertex(vertex, centroid):
-    """Return a vertex."""
-    assert 0 < _rho < 1
-    return centroid + _rho * (vertex - centroid)
+        Returns
+        -------
+        reflected_vertex : array of shape (N,)
+    """
+    assert alpha > 0
+    return centroid + alpha * (centroid - vertex)
 
-def get_shrunk_simplex(simplex, centroid, best_index):
-    """Return a simplex."""
+def get_expanded_vertex(vertex, centroid, gamma):
+    """Return a vertex.
+
+        Parameters
+        ----------
+        vertex : array of shape (N,)
+        centroid : array of shape (N,)
+        gamma: float
+            expansion factor
+
+        Returns
+        -------
+        expanded_vertex : array of shape (N,)
+    """
+    assert gamma > 1
+    return centroid + gamma * (vertex - centroid)
+
+def get_contracted_vertex(vertex, centroid, rho):
+    """Return a vertex.
+
+        Parameters
+        ----------
+        vertex : array of shape (N,)
+        centroid : array of shape (N,)
+        rho: float
+            contraction factor
+
+        Returns
+        -------
+        contracted_vertex : array of shape (N,)
+    """
+    assert 0 < rho < 1
+    return centroid + rho * (vertex - centroid)
+
+def get_shrunk_simplex(simplex, centroid, best_index, sigma):
+    """Return a simplex.
+
+        Parameters
+        ----------
+        simplex : array of shape (N + 1, N)
+        centroid : array of shape (N,)
+        best_index : int (0...N)
+            index of the vertex that is to be kept unchanged
+        sigma: float
+            shrink factor
+
+        Returns
+        -------
+        shrunk_simplex : array of shape (N + 1, N)
+    """
     # ========== input check  ============================ #
     shape = np.shape(simplex)
     assert len(shape) == 2
@@ -513,9 +472,9 @@ def get_shrunk_simplex(simplex, centroid, best_index):
     assert M == N + 1
     assert 0 <= best_index < M
 
-    assert 0 < _sigma < 1
-    # ==================================================== #
+    assert 0 < sigma < 1
 
+    # ========== shrink  ================================= #
     best_vertex = simplex[best_index]
     new_simplex = np.nan * np.ones_like(simplex)
 
@@ -523,23 +482,62 @@ def get_shrunk_simplex(simplex, centroid, best_index):
         vertex = simplex[m]
 
         if m != best_index:
-            # regular case: shrink towards best_vertex
-            new_vertex = best_vertex + _sigma * (vertex - best_vertex)
+            # non-best vertex: shrink towards best_vertex
+            new_vertex = best_vertex + sigma * (vertex - best_vertex)
         else:
-            # special case: best vertex
+            # best vertex
             new_vertex = copy(vertex)
 
         new_simplex[m] = new_vertex
 
-    # output check
+    # ========== output check  =========================== #
     assert np.sum(np.isnan(new_simplex)) == 0
 
     return new_simplex
 
 ###################################################
+# FORWARD FUNCTION                                #
+###################################################
+def get_function_values(simplex, fun, args, lookup_table):
+    """Return an array."""
+    # input check
+    shape = np.shape(simplex)
+    assert len(shape) == 2
+    M, N = shape
+    assert M == N + 1
+
+    # initialize
+    fvals = np.nan * np.ones(M)
+
+    # fill array
+    for m in range(M):
+        vertex = simplex[m]
+        fvals[m] = get_function_value(vertex, fun, args, lookup_table)
+
+    return fvals
+
+def get_function_value(vertex, fun, args, lookup_table):
+    """Return a float."""
+    # input check
+    shape = np.shape(vertex)
+    assert len(shape) == 1
+
+    # check loopup_table
+    result = get_function_value_from_lookup_table(lookup_table, vertex)
+
+    # call function
+    if result is None:
+        result = fun(vertex, *args)
+        add_function_value_to_loopkup_table(lookup_table, vertex, result)
+
+    assert np.shape(result) == ()
+    return result
+
+###################################################
 # LOOKUP TABLE                                    #
 ###################################################
 def initialize_lookup_table(vertex):
+    """Return a dict of function values on vertices."""
     N = len(vertex)
     return {
             'vertices' : np.ones((0, N)),
@@ -582,42 +580,151 @@ def add_function_value_to_loopkup_table(lookup_table, vertex, result):
     table['fun_values'] = np.insert(table['fun_values'], K, result, 0)
 
 ###################################################
-# FORWARD FUNCTION                                #
+# TERMINATION                                     #
 ###################################################
-def get_function_values(simplex, fun, args, lookup_table):
-    """Return an array."""
+def termination_reached(record, options):
+    """Return a bool."""
+    iteration_criterion = iteration_limit_reached(record, options)[0]
+    convergence_criterion = convergence_reached(record, options)
+    terminate = iteration_criterion or convergence_criterion
+    return terminate
+
+def iteration_limit_reached(record, options):
+    """Return (bool, str)."""
+    update_record(record, options)
+
+    it_lim_reached = False
+    message = ''
+
+    # maxiter
+    if record['Niter'] > options['maxiter']:
+        it_lim_reached = True
+        message = 'Maximum number of iterations reached.'
+
+    # maxfev
+    if record['Nfev'] > options['maxfev']:
+        it_lim_reached = True
+        message = 'Maximum number of function evaluations reached.'
+
+    # too little iterations
+    if record['Niter'] < 2:
+        it_lim_reached = False
+        message = ''
+
+    # maxtime
+    if record['time_passed'] > options['maxtime']:
+        it_lim_reached = True
+        message = 'Time limit surpassed.'
+
+    record['it_lim_reached'] = it_lim_reached, message
+
+    return it_lim_reached, message
+
+def convergence_reached(record, options):
+    """Return a bool."""
+    update_record(record, options)
+
+    conv_reached = True
+
+    if record['Niter'] < 2:
+        conv_reached = False
+
+    # fatol
+    span = function_uncertainty(record, options)
+    fatol = options['fatol']
+    if not span < fatol:
+        conv_reached = False
+
+    # xatol
+    spans = parameter_uncertainty(record, options)
+    xatol = options['xatol']
+    if np.sum(spans >= xatol) > 0:
+        conv_reached = False
+
+    record['convergence_reached'] = conv_reached
+
+    return conv_reached
+
+def function_uncertainty(record, options):
+    """Return a float.
+
+        Return maximum difference in function values of all points of the last
+        two simplices. Return infinity if history is shorter than 2.
+    """
+    last_fun_values = record['all_fun_values'][-2:]
+
+    # history too short:
+    if len(last_fun_values) < 2:
+        return np.inf
+
+    return np.ptp(last_fun_values)
+
+def parameter_uncertainty(record, options):
+    """Return an array of shape (N,).
+
+        Return maximum difference in parameter values of all points of the last
+        two simplices. Return infinity if history is shorter than 2.
+    """
+    all_simplices = record['all_simplices']
+    K, M, N = np.shape(all_simplices)
+
+    # history too short:
+    if K < 2:
+        return np.ones(N) * np.inf
+
+    # retrieve and reshape last two simplices
+    last_simplices = np.array(all_simplices[-2:])
+    last_simplices_reshaped = last_simplices.reshape((M*2, N))
+
+    # return maximum differences
+    return np.ptp(last_simplices_reshaped, 0)
+
+###################################################
+# MISC                                            #
+###################################################
+def update_record(record, options):
+    table = record['lookup_table']
+    record['Nfev'] = len(table['fun_values'])
+    record['Niter'] = len(record['all_simplices'])
+    record['time_passed'] = dt.datetime.now() - record['time_beg']
+    record['x_unc'] = parameter_uncertainty(record, options)
+    record['f_unc'] = function_uncertainty(record, options)
+    record['f'] = record['best_fun_values'][-1]
+    record['x'] = record['best_vertices'][-1]
+    return record
+
+def get_initial_simplex(x0, x0_uncert):
+    """Return a (N+1 x N)-array."""
     # input check
-    shape = np.shape(simplex)
-    assert len(shape) == 2
-    M, N = shape
-    assert M == N + 1
+    shape = np.shape(x0)
+    assert len(shape) == 1
+    assert np.shape(x0_uncert) == shape
 
     # initialize
-    fvals = np.nan * np.ones(M)
+    N = shape[0]
+    simplex = np.nan * np.zeros((N+1, N))
 
-    # fill array
-    for m in range(M):
-        vertex = simplex[m]
-        fvals[m] = get_function_value(vertex, fun, args, lookup_table)
+    # ========== create vertices  ======================== #
+    for n in range(-1, N):
+        vertex = 1. * copy(x0)
 
-    return fvals
+        # manipulate n-th coordinate
+        if n >= 0:
+            vertex[n] += 0.5 * x0_uncert[n]
 
-def get_function_value(vertex, fun, args, lookup_table):
-    """Return a float."""
-    # input check
-    shape = np.shape(vertex)
-    assert len(shape) == 1
+        # add vertex to simplex
+        simplex[n] = vertex
+    # ==================================================== #
 
-    # check loopup_table
-    result = get_function_value_from_lookup_table(lookup_table, vertex)
+    # output check
+    assert np.sum(np.isnan(simplex)) == 0
 
-    # call function
-    if result is None:
-        result = fun(vertex, *args)
-        add_function_value_to_loopkup_table(lookup_table, vertex, result)
+    return simplex
 
-    assert np.shape(result) == ()
-    return result
+def make_up_uncertainties(x0):
+    unc = 0.1 * np.abs(x0) 
+    unc[unc==0] = 0.1
+    return unc
 
 ###################################################
 # TEST FUNCTIONS                                  #
@@ -631,13 +738,25 @@ def styblinski(a):
     N = len(a)
     return np.sum(a**4 - 16 * a**2 + 5 * a) + N * 2 * 39.16617
 
+def styblinski_slow(a):
+    N = len(a)
+    sleep(0.03)
+    return np.sum(a**4 - 16 * a**2 + 5 * a) + N * 2 * 39.16617
+
+
 ###################################################
 # TESTING                                         #
 ###################################################
 if __name__ == '__main__':
-    x0 = - np.array([2.2, 1.5, 2.0])
-    x0_uncert = np.array([5., 5., 5.])
+    from time import sleep
+    reload(messages)
+    x0 = - np.array([2.2, 1.5, 2.0, 16., 1., 4., 5.])
+    x0_uncert = np.array([5., 5., 5., 10., 1.,  1., 1.])
+    # x0 = - np.array([2.2])
+    # x0_uncert = np.array([5.])
     # f = himmelblau
     f = styblinski
+    # f = styblinski_slow
 
-    record = minimize_nelder_mead(f, x0, x0_uncert=x0_uncert, disp=True)
+    record = minimize_nelder_mead(f, x0, x0_uncert=x0_uncert, disp=True,
+            maxfev=np.inf, maxiter=np.inf, maxtime_sec=50, fatol=10e-10)

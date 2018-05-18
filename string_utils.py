@@ -30,6 +30,17 @@ _BG_MAGENTA = '\033[45m'
 _BG_CYAN = '\033[46m'
 _BG_GREY = '\033[47m'
 
+# motions
+_UPWARD = '\033[1A'
+_DOWNWARD = '\033[1B'
+_FORWARD = '\033[1C'
+_BACKWARD = '\033[1D'
+
+_CLRSCR = '\033[2J'     # clear screen, move to (0, 0)
+_CLEARLINE  = '\033[K'  # erase to end of line
+_SAVECRS = '\033[s'     # save curser position
+_RESTORECRS = '\033[u'  # restore curser position
+
 ###################################################
 # HUMAN READABLE FORMATS                          #
 ###################################################
@@ -44,9 +55,10 @@ def human_format(num, digits=2, sep='', mode='prefix', type='float'):
             total (minimum) number of decimal digits to include. Default: 2
         sep : str, optional
             separator between the number and the prefix. Default: ''
-        mode : {'prefix', 'power'}, optional
+        mode : {'prefix', 'power', 'tex'}, optional
             'prefix' : SI prefix
-            'power' : power of 10, in tex format [ '$\\times 10^{power}$' ]
+            'power' : power of 10, in regular format [ '1.4e5' ]
+            'tex' : power of 10, in tex format [ '$\\times 10^{power}$' ]
             Default: 'prefix'
         type : {'float', 'int'}, optional
             if 'int', small numbers don't have decimal digits (i. e. '4' rather
@@ -64,7 +76,7 @@ def human_format(num, digits=2, sep='', mode='prefix', type='float'):
     ###################################################
     # INPUT CHECK                                     #
     ###################################################
-    valid_modes = ['prefix', 'power']
+    valid_modes = ['prefix', 'power', 'tex']
     valid_types = ['float', 'int']
 
     assert isinstance(digits, int)
@@ -73,12 +85,34 @@ def human_format(num, digits=2, sep='', mode='prefix', type='float'):
     assert type in valid_types
 
     ###################################################
+    # SPECIAL CASES                                   #
+    ###################################################
+    if np.isnan(num):
+        return 'NaN'
+
+    if np.isposinf(num):
+        if mode == 'tex':
+            return '$\\infty$'
+        else:
+            return 'inf'
+
+    if np.isneginf(num):
+        if mode == 'tex':
+            return '$-\\infty$'
+        else:
+            return '-inf'
+
+    ###################################################
     # SETUP                                           #
     ###################################################
     if mode == 'prefix':
         P = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
         p = ['', 'm', u'\u03bc', 'n', 'p', 'f', 'a', 'z', 'y']
     elif mode == 'power':
+        powers = range(0, 30, 3)
+        P = [''] + ['e%1.0f' % power for power in powers[1:]]
+        p = [''] + ['e-%1.0f' % power for power in powers[1:]]
+    elif mode == 'tex':
         powers = range(0, 30, 3)
         P = ['\\times\, 10^{%1.0f}' % power for power in powers]
         p = ['\\times\, 10^{-%1.0f}' % power for power in powers]
@@ -129,7 +163,7 @@ def human_format(num, digits=2, sep='', mode='prefix', type='float'):
     ###################################################
     # MATH MODE                                       #
     ###################################################
-    if mode == 'power':
+    if mode == 'tex':
         fmt = '$' + fmt + '$'
 
     ###################################################
