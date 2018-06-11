@@ -19,6 +19,8 @@ _BLUE = '\033[94m'
 _YELLOW = '\033[93m'
 _RED = '\033[91m'
 _GREEN = '\033[92m'
+_ORANGE = '\033[93m'
+_MAGENTA = '\033[95m'
 
 # background colors
 _BG_BLACK = '\033[40m'
@@ -274,9 +276,16 @@ def progress_bar_inner(fraction, length=77, fillcolor='', bgcolor=''):
     return filling
 
 def get_frac_block(Neighths):
+    """Return a unicode block element as str."""
+    # input check
+    if not isinstance(Neights, int):
+        raise TypeError('Neights must be int.')
+    if not 0 <= Neighths <= 8:
+        raise ValueError('Neights must be between 0 and 8.')
+
+    # special case: empty block element
     if Neighths == 0:
         return ' '
-    assert 0 <= Neighths <= 8
 
     pos0 = 0x2588   # full block
 
@@ -284,4 +293,20 @@ def get_frac_block(Neighths):
     inc = 8 - Neighths
     pos = pos0 + inc    # e. g. \0x259a for 5 eighths
 
+    return unichr(pos)
+
+def get_frac_block_vertical(Neighths):
+    """Return a unicode block element as str."""
+    # input check
+    if not isinstance(Neights, int):
+        raise TypeError('Neights must be int.')
+    if not 0 <= Neighths <= 8:
+        raise ValueError('Neights must be between 0 and 8.')
+
+    # special case: empty block element
+    if Neighths == 0:
+        return ' '
+
+    # regular case
+    pos0 = 0x2580 + int(Neights)
     return unichr(pos)
