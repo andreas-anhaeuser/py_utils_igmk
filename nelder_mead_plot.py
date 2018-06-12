@@ -61,10 +61,7 @@ def plot_all_parameters(record, filename, fun_log=False, fun_min=None,
     ###################################################
     # min/max
     if fun_min is None:
-        if fun_log:
-            fun_min = np.nanmin(best_fvals)
-        else:
-            fun_min = 0
+        fun_min = np.nanmin(best_fvals)
     if fun_max is None:
         fun_max = np.nanmax(worst_fvals)
         

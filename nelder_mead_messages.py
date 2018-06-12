@@ -1,20 +1,20 @@
 #!/usr/bin/python
+"""Interactive message display sub-module to nelder_mead."""
 
 import datetime as dt
 
-import string_utils
+import string_utils as su
 
-_col_widths = [30, 22, 22, 20]
+_col_widths = [25, 21, 21, 12]
 
 def hum_fmt(x, digits=2):
-    return string_utils.human_format(x, digits=digits, mode='power')
+    """Convert float to human-friendly string."""
+    return su.human_format(x, digits=digits, mode='power')
 
 def display_intermediate_message(record, options):
-    """Not implemented. Display and update something like this:
+    """Display progress overview.
 
-        iterations  :     45 /  200     |||||||      |    ( 34s per iteration )
-        func. eval. :     80 /  400     |||||||||    |    ( 18s per evaluation )
-        time        :   2:43 / 5:00     |||||||      |    ( 2:17 remaining )
+        Display something like this:
 
                         current (unc.)  | initial (unc.)  | tolerance
         function    :   4.9 (0.4)       | 12.1 (2.0)      | 0.01          |||         |
@@ -23,12 +23,21 @@ def display_intermediate_message(record, options):
         paramater 2 :
         paramater 3 :
         parameter 4 :    -43e-4 (43e-6) | -0.1 (0.02)     | 0.01          |||||||||||||
+
+        iterations  :     45 /  200     |||||||      |    ( 34s per iteration )
+        func. eval. :     80 /  400     |||||||||    |    ( 18s per evaluation )
+        time        :   2:43 / 5:00     |||||||      |    ( 2:17 remaining )
     """
 
     lines = []
+    lines += '\n'
     lines += get_parameter_section(record, options)
+
     lines += '\n'
     lines += get_exit_limits_section(record, options)
+
+    lines += '\n'
+    lines += get_action_history_section(record, options)
 
     text = ''.join(lines)
     remove_old_message(record, options)
@@ -37,19 +46,21 @@ def display_intermediate_message(record, options):
     return text
 
 def remove_old_message(record, options):
+    """Clear display from previously issued message."""
     if 'last_message' not in record.keys():
         record['last_message'] = ''
     text = record['last_message']
     Nlines = text.count('\n') + 1
 
-    su = string_utils
     for nline in range(Nlines):
-        print(su._UPWARD + su._CLEARLINE + su._UPWARD)
+        print(su.move_cursor('up') + su._CLEARLINE + su.move_cursor('up'))
 
 def record_message(record, options, text):
+    """Remember latest issued message."""
     record['last_message'] = text
 
 def get_exit_limits_section(record, options):
+    """Return a list of str."""
     lines = []
     parameters = ('maxiter', 'maxfev', 'maxtime')
     for parameter in parameters:
@@ -58,6 +69,7 @@ def get_exit_limits_section(record, options):
     return lines
 
 def get_exit_limit_line(record, options, parameter):
+    """Return a str."""
     secs_passed = record['time_passed'].total_seconds()
 
     # maxiter
@@ -69,7 +81,7 @@ def get_exit_limit_line(record, options, parameter):
         val_max_str = str(val_max)
         rate = 1. * secs_passed / val
         rate_str = hum_fmt(rate)
-        annotation = rate_str + 's per iteration'
+        annotation = rate_str + 's / iter.'
 
     # maxfev
     elif parameter == 'maxfev':
@@ -80,7 +92,7 @@ def get_exit_limit_line(record, options, parameter):
         val_max_str = str(val_max)
         rate = 1. * secs_passed / val
         rate_str = hum_fmt(rate)
-        annotation = rate_str + 's per evaluation'
+        annotation = rate_str + 's / eval.'
 
     # maxtime
     elif parameter == 'maxtime':
@@ -91,7 +103,11 @@ def get_exit_limit_line(record, options, parameter):
         val_max = maxtime.total_seconds()
         val_str = nice_timedelta_string(passed)
         val_max_str = nice_timedelta_string(maxtime)
-        rem_str = max(0, nice_timedelta_string(maxtime - passed))
+        if passed > maxtime:
+            rem = dt.timedelta(0)
+        else:
+            rem = maxtime - passed
+        rem_str = max(0, nice_timedelta_string(rem))
         annotation = rem_str + ' remaining'
 
     # column width
@@ -100,23 +116,27 @@ def get_exit_limit_line(record, options, parameter):
     # progress bars
     fraction = min(1, 1. * val / val_max)
     if fraction == 1:
-        color = string_utils._RED
+        color = su.color('red')
     else:
         color = ''
-    progress_bar = string_utils.progress_bar(fraction, cws[2]+1, color)
+    progress_bar = su.progress_bar(fraction, cws[2]+1, color)
+
+    name = name[:cws[0]-1]
 
             # '{:>{hcw}s} / {:>{hcw}s}'.format(val_str, val_max_str, hcw=hcw) + \
     # build line
-    line =  string_utils._BOLD + color + \
-            ('%s:' % name).ljust(cws[0]) + string_utils._ENDC +\
-            color + '{:>{cw}s}'.format(('%s / %s ' % (val_str, val_max_str)),
-                    cw=cws[1]-2) + \
-            ' %s' % progress_bar + \
-            ' ( %s )' % annotation + \
+    line = (su.color('bold') + color +
+            ('%s:' % name).ljust(cws[0]) + su.color(None) +
+            color + '{:>{cw}s}'.format(
+                ('%s / %s ' % (val_str, val_max_str)), cw=cws[1]-2) +
+            ' %s' % progress_bar +
+            ' ( %s )' % annotation +
             '\n'
+            )
     return line
 
 def get_parameter_section(record, options):
+    """Return a list of str."""
     header = get_parameter_header_line()
     lines = [header]
 
@@ -129,18 +149,22 @@ def get_parameter_section(record, options):
     return lines
 
 def get_parameter_header_line():
+    """Return a str."""
     cws = _col_widths
-    words = [string_utils._BOLD]
+    words = [su.color('bold')]
     words.append(''.ljust(cws[0]))
     words.append('current (unc.) |'.rjust(cws[1]))
     words.append('initial (unc.) |'.rjust(cws[2]))
     words.append('  tol.')
-    words.append(string_utils._ENDC)
+    words.append(su.color(None))
     line = ''.join(words) + '\n'
     return line
 
 def get_parameter_line(record, options, n=-1):
-    """n == -1 for function."""
+    """Return a str.
+    
+        If n == -1 return line for forward function.
+    """
     if n == -1:
         name = 'function'
         val = record['f']
@@ -164,27 +188,30 @@ def get_parameter_line(record, options, n=-1):
     # column width
     cws = _col_widths
 
+    name = name[:cws[0]-1]
+
     # progress bars
     if fraction == 1:
-        color = string_utils._GREEN
+        color = su.color('g')
     else:
         color = ''
-    progress_bar = string_utils.progress_bar(fraction, cws[3], color)
+    progress_bar = su.progress_bar(fraction, cws[3], color)
 
     # build line
-    line =  string_utils._BOLD + color + (name + ':').ljust(cws[0]) + \
-            string_utils._ENDC + \
-            color + u'{:>{cw}s} '.format(val_unc_str(val, unc) + ' |',
-                    cw=cws[1]) + \
-            u'{:>{cw}s} '.format(val_unc_str(val0, unc0) + ' |', cw=cws[2]-1) + \
-            u'{:>{w}s} '.format(hum_fmt(tol), w=6) + \
-            ' %s' % progress_bar + \
+    line = (su.color('bold') + color + (name + ':').ljust(cws[0]) +
+            su.color(None) +
+            color + u'{:>{cw}s} '.format(
+                val_unc_str(val, unc) + ' |', cw=cws[1]) +
+            u'{:>{cw}s} '.format(val_unc_str(val0, unc0) + ' |', cw=cws[2]-1) +
+            u'{:>{w}s} '.format(hum_fmt(tol), w=6) +
+            ' %s' % progress_bar +
             '\n'
+            )
     return line
 
 def val_unc_str(value, unc):
     """Return str."""
-    val_str = hum_fmt(value, 5)
+    val_str = hum_fmt(value, 4)
     unc_str = hum_fmt(unc, 2)
     return '%s (%s)' % (val_str, unc_str)
 
@@ -213,13 +240,56 @@ def display_termination_message(record, options=None):
               ''
     print(message)
 
+def get_action_history_section(record, options):
+    """Return a str."""
+    # constants
+    colors = [''] * 5
+    endc = su.color(None)
+
+    chars = 'ISCRE'
+    symbols = (
+            unichr(0x2584),
+            unichr(0x2581),
+            unichr(0x2582),
+            unichr(0x2584),
+            unichr(0x2588),
+            )
+
+    length = sum(_col_widths) + 2 * len(_col_widths)
+    actions = record['action'][-length:]
+
+    line_header = su.color('bold') + 'Simplex modification:\n' + endc
+    line_footer = (
+            '(%sI%s)nitialize' % (colors[0], endc) +
+            ', (%sS%s)hrink' % (colors[1], endc) +
+            ', (%sC%s)ontract' % (colors[2], endc) +
+            ', (%sR%s)eflect' % (colors[3], endc) +
+            ', (%sE%s)xpand' % (colors[4], endc) +
+            su.color(None) + '\n'
+            )
+
+    line_char = ''
+    line_sym = ''
+    for action in actions:
+        char = chars[action]
+        sym = symbols[action]
+        color = colors[action]
+        line_char = line_char + color + char + endc
+        line_sym = line_sym + color + sym + endc
+
+    finish = lambda s: s + su.color(None) + '\n'
+
+    line_char = finish(line_char)
+    line_sym = finish(line_sym)
+
+    return line_header + line_sym + line_char + line_footer
 
 def get_termination_message(record, options):
     """Return a str."""
     # convergence
     if record['convergence_reached']:
         return 'Convergence reached.'
-    
+
     # iteration limit
     itlim, message = record['it_lim_reached']
     if itlim:
