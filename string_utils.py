@@ -16,20 +16,21 @@ import numpy as np
 _ENDC = '\033[0m'
 _BOLD = '\033[1m'
 _BLUE = '\033[94m'
-_YELLOW = '\033[93m'
-_RED = '\033[91m'
+_CYAN = '\033[96m'
 _GREEN = '\033[92m'
-_ORANGE = '\033[93m'
 _MAGENTA = '\033[95m'
+_ORANGE = '\033[93m'
+_RED = '\033[91m'
+_YELLOW = '\033[93m'
 
 # background colors
 _BG_BLACK = '\033[40m'
+_BG_BLUE = '\033[44m'
+_BG_CYAN = '\033[46m'
 _BG_RED = '\033[41m'
 _BG_GREEN = '\033[42m'
 _BG_ORANGE = '\033[43m'
-_BG_BLUE = '\033[44m'
 _BG_MAGENTA = '\033[45m'
-_BG_CYAN = '\033[46m'
 _BG_GREY = '\033[47m'
 
 # motions
@@ -40,8 +41,8 @@ _BACKWARD = '\033[1D'
 
 _CLRSCR = '\033[2J'     # clear screen, move to (0, 0)
 _CLEARLINE  = '\033[K'  # erase to end of line
-_SAVECRS = '\033[s'     # save curser position
-_RESTORECRS = '\033[u'  # restore curser position
+_SAVECRS = '\033[s'     # save cursor position
+_RESTORECRS = '\033[u'  # restore cursor position
 
 ###################################################
 # HUMAN READABLE FORMATS                          #
@@ -278,10 +279,10 @@ def progress_bar_inner(fraction, length=77, fillcolor='', bgcolor=''):
 def get_frac_block(Neighths):
     """Return a unicode block element as str."""
     # input check
-    if not isinstance(Neights, int):
-        raise TypeError('Neights must be int.')
+    if not isinstance(Neighths, int):
+        raise TypeError('Neighths must be int.')
     if not 0 <= Neighths <= 8:
-        raise ValueError('Neights must be between 0 and 8.')
+        raise ValueError('Neighths must be between 0 and 8.')
 
     # special case: empty block element
     if Neighths == 0:
@@ -298,15 +299,113 @@ def get_frac_block(Neighths):
 def get_frac_block_vertical(Neighths):
     """Return a unicode block element as str."""
     # input check
-    if not isinstance(Neights, int):
-        raise TypeError('Neights must be int.')
+    if not isinstance(Neighths, int):
+        raise TypeError('Neighths must be int.')
     if not 0 <= Neighths <= 8:
-        raise ValueError('Neights must be between 0 and 8.')
+        raise ValueError('Neighths must be between 0 and 8.')
 
     # special case: empty block element
     if Neighths == 0:
         return ' '
 
     # regular case
-    pos0 = 0x2580 + int(Neights)
+    pos0 = 0x2580 + int(Neighths)
     return unichr(pos)
+
+###################################################
+# COLORS                                          #
+###################################################
+def color(col=None):
+    if col is None:
+        col = 'none'
+    if not isinstance(col, str):
+        raise TypeError('col must be str or None.')
+    col = col.lower()
+
+    if col == 'none':
+        return _ENDC
+    elif col in ('b', 'blue'):
+        return _BLUE
+    elif col in ('c', 'cyan'):
+        return _CYAN
+    elif col in ('g', 'green'):
+        return _GREEN
+    elif col in ('o', 'orange'):
+        return _ORANGE
+    elif col in ('m', 'magenta'):
+        return _MAGENTA
+    elif col in ('r', 'red'):
+        return _RED
+    elif col in ('w', 'white', 'bold'):
+        return _BOLD
+    elif col in ('y', 'yellow'):
+        return _YELLLOW
+    else:
+        raise ValueError('Unknown color: %s' % col)
+
+def bg_color(col):
+    if col is None:
+        col = 'none'
+    if not isinstance(col, str):
+        raise TypeError('col must be str or None.')
+    col = col.lower()
+
+    if col == 'none':
+        return _BG_BLACK
+    elif col in ('b', 'blue'):
+        return _BG_BLUE
+    elif col in ('c', 'cyan'):
+        return _BG_CYAN
+    elif col in ('g', 'green'):
+        return _BG_GREEN
+    elif col in ('m', 'magenta'):
+        return _BG_MAGENTA
+    elif col in ('o', 'orange'):
+        return _BG_ORANGE
+    elif col in ('r', 'red'):
+        return _BG_RED
+    elif col in ('w', 'white', 'bold'):
+        return _BG_BOLD
+    elif col in ('y', 'yellow'):
+        return _BG_YELLLOW
+    else:
+        raise ValueError('Unknown color: %s' % col)
+
+###################################################
+# CURSOR                                          #
+###################################################
+def move_cursor(m):
+    """u(pward), d(ownward), f(orward) or b(ackward)."""
+    if not isinstance(m, str):
+        raise TypeError('m must be str or None.')
+    m = m.lower()[0]
+
+    if m == 'u':
+        return _UPWARD
+    elif m == 'd':
+        return _DOWNWARD
+    elif m == 'f':
+        return _FORWARD
+    elif m == 'b':
+        return _BACKWARD
+    else:
+        raise ValueError('Unknown motion: %s' % col)
+
+def save_cursor_pos():
+    """Return a str."""
+    return _SAVECRS
+
+def restore_cursor_pos():
+    """Return a str."""
+    return _RESTORECRS
+
+###################################################
+# CLEAR                                           #
+###################################################
+def clear_screen():
+    """Return a str."""
+    return _CLRSCR
+
+def clear_line():
+    """Return a str."""
+    return _CLEARLINE
