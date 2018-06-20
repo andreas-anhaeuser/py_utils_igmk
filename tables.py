@@ -149,8 +149,7 @@ def read_vartable(filename, sep='|', comment='#', ignore_str=' '):
 
     return table
 
-def read_namelist(filename, name_end=':', sep=',', comment='#',
-        ignore_char=' ', convert_to_number=False, conversion_error=False):
+def read_namelist(filename, *args, **kwargs):
     """Read namelist (setup) text file and return as a dict.
 
         Parameters
@@ -214,10 +213,116 @@ def read_namelist(filename, name_end=':', sep=',', comment='#',
     ###################################################
     # READ FILE                                       #
     ###################################################
-    fid = open(filename, 'r')
-    lines = fid.readlines()
-    fid.close()
+    with open(filename, 'r') as fid:
+        lines = fid.readlines()
 
+    return get_namelist(lines, *args, **kwargs)
+
+def read_structured_namelist(filename, *args, **kwargs):
+    """Read structured namelist (setup) text file and return as a dict."""
+    if not os.path.isfile(filename):
+        raise IOError('Cannot access file ' + filename)
+
+    ###################################################
+    # READ FILE                                       #
+    ###################################################
+    with open(filename, 'r') as fid:
+        lines = fid.readlines()
+
+    return get_structured_namelist(lines, *args, **kwargs)
+
+def get_structured_namelist(lines, struc_sep='>', *args, **kwargs):
+    """Return a dict of dict."""
+    N = len(lines)
+    found = False
+    for n, line in enumerate(lines):
+        if line.strip()[:1] == struc_sep:
+            nbeg = n
+            found = True
+            break
+    if not found:
+        raise IOError('Cannot find structure separator %s' % struc_sep)
+
+    namelist = {}
+
+    while nbeg < N - 1:
+        for n in range(nbeg+1, N):
+            line = lines[n].strip()
+            if line[:1] == struc_sep:
+                nend = n
+                break
+
+            if n == N - 1:
+                nend = n
+                break
+
+        key = lines[nbeg][1:].strip()
+        if key in namelist.keys():
+            raise IndexError('Duplicate key: %s' % key)
+
+        namelist[key] = get_namelist(lines[nbeg+1:nend], *args, **kwargs)
+        nbeg = nend
+
+    return namelist
+
+def get_namelist(lines, name_end=':', sep=',', comment='#',
+        ignore_char=' ', convert_to_number=False, conversion_error=False):
+    """Convert list of lines to dict.
+
+        Parameters
+        ----------
+        lines : list of str
+        name_end : str, optional
+            string that marks the end of the parameter name. Default: ':'
+        sep : str, optional
+            string that separates elements of a value list. Default: ','
+        comment : str, optional
+            string that indicates the start of a comment. Default: '#'
+        ignore_char : str, optional
+            The entries are shortened while they start or end on this
+            character(s).  Set to '' to deactivate. Default: ' '
+        convert_to_number : bool, optional
+            If True, entries that are not bounded by ' or " are converted to
+            number (int or float). Default: False
+        conversion_error : bool, optional
+            If True, an error is thrown on attempted number conversion on
+            invalid string. Default: False
+
+        Returns
+        -------
+        table : dict
+            keys are the header
+        
+        Example
+        -------
+        An ascii file like this
+        
+        name : Berlin
+        population : 3466164
+        districts : Wedding, Marzahn, Pankow        # ... and some more
+        area code : 030
+        # coolest clubs : outdated information
+        average temperature : 9.7
+        
+        is returned as this dictionary:
+        
+        >>> namelist
+        {'name' : 'Berlin',
+        'population' : '3466164',
+        'districts' : ['Wedding', 'Marzahn', 'Pankow'],
+        'area code' : '030',
+        'average temperature' : '9.7',
+        }
+
+        Author
+        ------
+        Written in 2016-2018
+        by Andreas Anhaeuser
+        Institute for Geophysics and Meteorology
+        University of Cologne
+        Germany
+        <anhaeus@meteo.uni-koeln.de>
+    """
     ###################################################
     # INITIALIZE                                      #
     ###################################################
@@ -262,7 +367,6 @@ def read_namelist(filename, name_end=':', sep=',', comment='#',
             for n in range(len(data)):
                 data[n] = data[n].strip(ignore_char)
 
-
         ###################################################
         # FLOAT CONVERSION                                #
         ###################################################
@@ -279,7 +383,7 @@ def read_namelist(filename, name_end=':', sep=',', comment='#',
         if name in namelist.keys():
             raise KeyError(name + ' appears multiple times in namelist.')
         namelist[name] = data
-
+        
     return namelist
 
 def str2num(s):
@@ -602,5 +706,5 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#'):
 # TESTING                                         #
 ###################################################
 if __name__ == '__main__':
-    fn = '/home/anhaeus/py/blh/create_nc_files/comparison.table'
-    cols = get_column_list(fn)
+    fn = '/home/anhaeus/acloud/aa_utils/setup.plot.lev_03.txt'
+    namelist = read_structured_namelist(fn)
