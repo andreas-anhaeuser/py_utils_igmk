@@ -17,6 +17,8 @@
 """
 import os
 import datetime as dt
+import warnings
+
 import numpy as np
 
 import string_utils
@@ -144,6 +146,8 @@ class Chronometer(object):
         self.Nlines_last_message = 0
         self.time_of_last_message = now
         self.show_message_times = show_message_times
+
+        warnings.showwarning = self.showwarning
 
     ###################################################
     # HELPER FUNCTIONS                                #
@@ -442,6 +446,30 @@ class Chronometer(object):
     def resumee(self, usermessage=None):
         self.show(force=True, usermessage=usermessage,
                 mode='resumee',)
+
+    def warning(self, message, prefix='WARNING: '):
+        """Issue a warning."""
+        self.issue(_YELLOW + prefix+ _ENDC + message )
+
+    def showwarning(self, *args, **kwargs):
+        """Overwrite default implementation."""
+        prefix = ' ' * 24
+        warning = args[0]
+        type = args[1]
+        where = args[2]
+        lineno = args[3]
+        message = warning.message
+        text = (message + ' in\n' +
+                prefix + str(lineno) + ':' + where + '\n' +
+                prefix + '(Type: ' + str(type) + ')')
+        self.warning(text)
+
+    def debug_warning(self, module_name):
+        """Issue a DEBUG-mode warning."""
+        text = (_BOLD + _RED + 'DEBUG' + _ENDC +
+                 '-mode in ' +
+                 _BOLD + module_name + _ENDC)
+        self.warning(text)
 
     ###################################################
     # COUNT                                           #
