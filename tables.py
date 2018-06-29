@@ -13,6 +13,8 @@ Germany
 import os
 import collections
 
+_str_delims = ('"', "'")
+
 def read_vartable(filename, sep='|', comment='#', ignore_str=' '):
     """Read variable table text file and return as a dict.
 
@@ -266,7 +268,8 @@ def get_structured_namelist(lines, struc_sep='>', *args, **kwargs):
     return namelist
 
 def get_namelist(lines, name_end=':', sep=',', comment='#',
-        ignore_char=' ', convert_to_number=False, conversion_error=False):
+        ignore_char=' ', convert_to_number=False, conversion_error=False,
+        str_delims=_str_delims, strip_string_delimiters=True):
     """Convert list of lines to dict.
 
         Parameters
@@ -357,12 +360,15 @@ def get_namelist(lines, name_end=':', sep=',', comment='#',
         ###################################################
         name, data = line.split(name_end)
         name = name.strip(ignore_char)
-        data = data.strip(ignore_char)
+        data = data.strip().strip(ignore_char)
 
         ###################################################
         # SPLIT DATA                                      #
         ###################################################
-        if S > 0 and sep in data:
+        cond1 = S > 0
+        cond2 = sep in data
+        cond3 = not has_delimiters(data, str_delims)
+        if cond1 and cond2 and cond3:
             data = data.split(sep)
             for n in range(len(data)):
                 data[n] = data[n].strip(ignore_char)
@@ -372,10 +378,17 @@ def get_namelist(lines, name_end=':', sep=',', comment='#',
         ###################################################
         if convert_to_number:
             try:
-                data = str2num(data)
+                data = str2num(data, str_delims)
             except ValueError as e:
                 if conversion_error:
                     raise e
+        
+        ###################################################
+        # REMOVE STRING DELIMITERS                        #
+        ###################################################
+        if strip_string_delimiters:
+            if isinstance(data, str):
+                data = strip_delimiters(data, str_delims)
 
         ###################################################
         # WRITE TO DICT                                   #
@@ -386,19 +399,30 @@ def get_namelist(lines, name_end=':', sep=',', comment='#',
         
     return namelist
 
-def str2num(s):
+def has_delimiters(s, delims=_str_delims):
+    """Return True if string starts and ends with the same string delimiter."""
+    for delim in delims:
+        if s[:1] == s[-1:] == delim:
+            return True
+    return False
+
+def strip_delimiters(s, delims=_str_delims):
+    for delim in delims:
+        if s[:1] == s[-1:] == delim:
+            return s[1:-1]
+    return s
+
+def str2num(s, str_delims=_str_delims):
     """Convert to number if it does not contain ' or " ."""
     # list case
     if not isinstance(s, str):
         if isinstance(s, collections.Iterable):
             return [str2num(el) for el in s]
 
-    # check whether ' or " is in str
+    # check whether s is bounded with ' or "
     str_delims = ('"', "'")
-    is_string = False
-    for str_delim in str_delims:
-        if s[:1] == s[-1:] == str_delim:
-            return s[1:-1]
+    if has_delimiters(s, str_delims):
+        return s
 
     # try int
     if s.isdigit():
