@@ -750,13 +750,16 @@ def styblinski_slow(a):
 if __name__ == '__main__':
     from time import sleep
     reload(messages)
-    x0 = - np.array([2.2, 1.5, 2.0, 16., 1., 4., 5.])
-    x0_uncert = np.array([5., 5., 5., 10., 1.,  1., 1.])
-    # x0 = - np.array([2.2])
-    # x0_uncert = np.array([5.])
+    # x0 = - np.array([2.2, 1.5, 2.0, 16., 1., 4., 5.])
+    # x0_uncert = np.array([5., 5., 5., 10., 1.,  1., 1.])
+    maxtime_sec = 5
+    N = 9
+    x0 = - np.array([2.2]*N)
+    x0_uncert = np.array([5.]*N)
     # f = himmelblau
     f = styblinski
     # f = styblinski_slow
 
     record = minimize_nelder_mead(f, x0, x0_uncert=x0_uncert, disp=True,
-            maxfev=np.inf, maxiter=np.inf, maxtime_sec=50, fatol=10e-10)
+            maxfev=np.inf, maxiter=np.inf, maxtime_sec=maxtime_sec,
+            fatol=10e-10)

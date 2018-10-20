@@ -153,8 +153,8 @@ def get_parameter_header_line():
     cws = _col_widths
     words = [su.color('bold')]
     words.append(''.ljust(cws[0]))
-    words.append('current (unc.) |'.rjust(cws[1]))
-    words.append('initial (unc.) |'.rjust(cws[2]))
+    words.append('initial (unc.) |'.rjust(cws[1]))
+    words.append('current (unc.) |'.rjust(cws[2]))
     words.append('  tol.')
     words.append(su.color(None))
     line = ''.join(words) + '\n'
@@ -198,13 +198,17 @@ def get_parameter_line(record, options, n=-1):
     progress_bar = su.progress_bar(fraction, cws[3], color)
 
     # build line
-    line = (su.color('bold') + color + (name + ':').ljust(cws[0]) +
-            su.color(None) +
-            color + u'{:>{cw}s} '.format(
-                val_unc_str(val, unc) + ' |', cw=cws[1]) +
-            u'{:>{cw}s} '.format(val_unc_str(val0, unc0) + ' |', cw=cws[2]-1) +
-            u'{:>{w}s} '.format(hum_fmt(tol), w=6) +
-            ' %s' % progress_bar +
+    line = (# Name:
+            su.color('bold') + color + (name + ':').ljust(cws[0]) +
+            # Color:
+            su.color(None) + color +
+            # Initial:
+            u'{:>{cw}s} '.format(val_unc_str(val0, unc0) + ' |', cw=cws[1]) +
+            # Current:
+            u'{:>{cw}s} '.format(val_unc_str(val, unc) + ' |', cw=cws[2]-1) +
+            # Progress bar:
+            u'{:>{w}s} '.format(hum_fmt(tol), w=6) + ' %s' % progress_bar +
+            # Newline:
             '\n'
             )
     return line
