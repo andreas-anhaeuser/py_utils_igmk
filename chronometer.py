@@ -115,8 +115,10 @@ class Chronometer(object):
     ###################################################
     # INIT                                            #
     ###################################################
-    def __init__(self, total_count, time_step=0.02, header='',
-            show_message_times=True,):
+    def __init__(
+            self, total_count, time_step=0.03, header='', info='',
+            show_message_times=True,
+            ):
         """Initialize.
 
             Parameters
@@ -138,6 +140,7 @@ class Chronometer(object):
         self.count = 0
 
         self.header = header
+        self.info = info
 
         self.time_step = time_step
         self.start = now
@@ -147,7 +150,7 @@ class Chronometer(object):
         self.time_of_last_message = now
         self.show_message_times = show_message_times
 
-        warnings.showwarning = self.showwarning
+        warnings.showwarning = self.custom_warning
 
     ###################################################
     # HELPER FUNCTIONS                                #
@@ -255,7 +258,7 @@ class Chronometer(object):
         ###################################################
         if mode is None:
             mode = 'run'
-        valid_modes = ['run', 'resumee']
+        valid_modes = ('run', 'resumee')
         assert mode in valid_modes
 
         ###################################################
@@ -269,10 +272,19 @@ class Chronometer(object):
         text = text + '\n'
 
         # header line
+        indent = ' ' * _col_width[0]
         if self.header != '':
             length = sum(_col_width)
-            line = _BLUE + self.header.center(length) + _ENDC + '\n\n'
+            line = indent + _BLUE + self.header + _ENDC + '\n'
             text = text + line
+
+        if self.info != '':
+            lines = self.info.split('\n')
+            for line in lines:
+                line = indent + line + _ENDC + '\n'
+                text = text + line
+
+        text = text + '\n'
 
         ###################################################
         # SPEED AND TIME                                  #
@@ -451,7 +463,7 @@ class Chronometer(object):
         """Issue a warning."""
         self.issue(_YELLOW + prefix+ _ENDC + message )
 
-    def showwarning(self, *args, **kwargs):
+    def custom_warning(self, *args, **kwargs):
         """Overwrite default implementation."""
         prefix = ' ' * 24
         warning = args[0]
