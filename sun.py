@@ -8,6 +8,10 @@
     Institute for Geophysics and Meteorology
     University of Cologne, Germany
 """
+# standard modules
+import datetime as dt
+
+# PyPI modules
 import ephem
 
 def utc_sunrise_sunset(d, lon, lat, alt=0, pres=None, temp=None):

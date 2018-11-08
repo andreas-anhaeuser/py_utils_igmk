@@ -46,7 +46,7 @@
     <anhaeus@meteo.uni-koeln.de>
 """
 
-# python modules
+# PyPI modules
 import numpy as np
 
 # own modules

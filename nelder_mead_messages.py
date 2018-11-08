@@ -1,8 +1,10 @@
 #!/usr/bin/python
 """Interactive message display sub-module to nelder_mead."""
 
+# standard modules
 import datetime as dt
 
+# local modules
 import string_utils as su
 
 _col_widths = [25, 21, 21, 12]

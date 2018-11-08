@@ -9,10 +9,13 @@
     University of Cologne, Germany
 """
 
-import numpy as np
-import datetime as dt
+# standard modules
 import calendar
 import collections
+import datetime as dt
+
+# PyPI modules
+import numpy as np
 
 #        ********************************************
 #        *                  CLASSES                 *
@@ -1102,6 +1105,6 @@ if __name__ == "__main__":
     beg = dt.datetime(2017, 1, 1)
     end = dt.datetime(2017, 1, 2)
     inc = dt.timedelta(hours=6)
-    print datetime_range(beg, end, inc)
-    print ''
-    print datetime_range(end, beg, -inc)
+    print(datetime_range(beg, end, inc))
+    print('')
+    print(datetime_range(end, beg, -inc))

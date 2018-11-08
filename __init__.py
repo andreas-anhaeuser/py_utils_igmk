@@ -1,4 +1,4 @@
 #!/usr/bin/python
 
-import meteo
-import string_utils
+from . import meteo
+from . import string_utils

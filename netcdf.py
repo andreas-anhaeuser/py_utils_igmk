@@ -18,12 +18,16 @@
     2016      (CF): Extending cast()-function, debugging.
 """
 
+# standard modules
 import os
-import numpy as np
-import warnings
 from collections import Iterable
+import warnings
+
+# PyPI modules
+import numpy as np
 from netCDF4 import Dataset
 
+# local modules
 import string_utils as aa_str
 
 #################################################

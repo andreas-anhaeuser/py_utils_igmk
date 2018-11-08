@@ -60,9 +60,12 @@
     <anhaeus@meteo.uni-koeln.de>
 """
 
+# standard modules
 import os
 import sys
 import argparse
+
+# PyPI modules
 import numpy as np
 from scipy import ndimage
 from scipy import constants as cst

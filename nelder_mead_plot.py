@@ -8,6 +8,7 @@
     <andreas.anhaeuser@posteo.net>
 """
 
+# PyPI modules
 import numpy as np
 from scipy.interpolate import griddata
 import matplotlib as mpl

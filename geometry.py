@@ -8,9 +8,13 @@
     University of Cologne, Germany
     <andreas.anhaeuser@posteo.net>
 """
+
+# standard modules
 import collections
-import numpy as np
 import warnings 
+
+# PyPI modules
+import numpy as np
 
 # The spheroid values are from the World Geodetic System:
 _earth_radius       = 6.3710e6    # (m) Earth's mean radius

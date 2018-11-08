@@ -57,11 +57,14 @@
     <anhaeus@meteo.uni-koeln.de>
 """
 
-import numpy as np
-import warnings
-import collections
+# standard modules
 from bisect import bisect
+import collections
 from copy import deepcopy as copy
+import warnings
+
+# PyPI modules
+import numpy as np
 
 #######################################
 # CONSTANTS                           #

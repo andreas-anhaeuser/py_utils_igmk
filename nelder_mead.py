@@ -51,11 +51,15 @@
     <andreas.anhaeuser@posteo.net>
 """
 
+# standard modules
 from copy import deepcopy as copy
 import datetime as dt
+
+# PyPI modules
 import numpy as np
 from scipy.optimize import OptimizeResult
 
+# local modules
 import nelder_mead_messages as messages
 
 _alpha = 1.     # reflection factor

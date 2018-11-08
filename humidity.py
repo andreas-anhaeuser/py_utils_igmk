@@ -33,8 +33,10 @@
     results.
 """
 
+# PyPI modules
 import numpy as np
 
+# local modules
 import meteo as met
 
 _epsilon = met._epsilon

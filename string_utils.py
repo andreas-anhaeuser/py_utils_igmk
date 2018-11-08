@@ -7,6 +7,8 @@
     Institute for Geophysics and Meteorology
     University of Cologne, Germany
 """
+
+# PyPI modules
 import numpy as np
 
 ###################################################

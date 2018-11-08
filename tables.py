@@ -10,6 +10,8 @@ University of Cologne
 Germany
 <anhaeus@meteo.uni-koeln.de>
 """
+
+# standard modules
 import os
 import collections
 

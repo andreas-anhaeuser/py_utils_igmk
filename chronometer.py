@@ -15,12 +15,16 @@
     2017-01-25 (AA): Changed layout
     2018-01-25 (AA): Updated docstring.
 """
+
+# standard modules
 import os
 import datetime as dt
 import warnings
 
+# PyPI modules
 import numpy as np
 
+# local modules
 import string_utils
 
 ###################################################
