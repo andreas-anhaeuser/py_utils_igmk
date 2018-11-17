@@ -218,14 +218,14 @@ def is_night(d, lon, lat):
     Description, see `is_day`."""
     return not is_day(d, lon, lat)
 
-def last_sunrise(d, lon, lat, alt=0, pres=None, temp=None):
+def last_sunrise(*args, **kwargs):
     """Return a dt.datetime.
 
-        The horizon is assumed to be at 0 degrees, regardless of the altitude.
+        Regardless of the altitude, the horizon is assumed to be at 0 deg.
 
         Parameters
         ----------
-        d : datetime.date or datetime.datetime
+        time : datetime.date or datetime.datetime
         lon: float
             the observer's longitude in deg North
         lat: float
@@ -248,14 +248,77 @@ def last_sunrise(d, lon, lat, alt=0, pres=None, temp=None):
         Unlike utc_sunrise_sunset, this function always returns a
         datetime.datetime object. If necessary, it goes back several days until
         it finds a sunrise.
+    """
+    event_name = 'last_sr'
+    return find_neighbouring_event(event_name, *args, **kwargs)
 
-        Dependencies
-        ------------
-        Makes use of the package ephem.
+def last_sunset(*args, **kwargs):
+    """Return a dt.datetime.
+
+        For description, see last_sunrise
+    """
+    event_name = 'last_ss'
+    return find_neighbouring_event(event_name, *args, **kwargs)
+
+def next_sunrise(*args, **kwargs):
+    """Return a dt.datetime.
+
+        For description, see last_sunrise
+    """
+    event_name = 'next_sr'
+    return find_neighbouring_event(event_name, *args, **kwargs)
+
+def next_sunset(*args, **kwargs):
+    """Return a dt.datetime.
+
+        For description, see last_sunrise
+    """
+    event_name = 'next_ss'
+    return find_neighbouring_event(event_name, *args, **kwargs)
+
+def find_neighbouring_event(event_name, time, lon, lat, alt=0, pres=None, temp=None):
+    """Return a datetime.datetime.
+
+        Regardless of the altitude, the horizon is assumed to be at 0 deg.
+
+        Parameters
+        ----------
+        event_name : str
+            {'next_sr', 'next_ss', 'last_sr', 'last_ss'}
+        time : datetime.date or datetime.datetime
+        lon: float
+            the observer's longitude in deg North
+        lat: float
+            the observer's latitude in deg East
+        alt: float
+            the observer's altitude above the surface in meters
+        pres : float, optional
+            (Pa) pressure at ground. Used to compute atmospheric light
+            refraction. Note: overrides alt !
+        temp : float, optional
+            (K) temperature at ground. Used to compute atmospheric light
+            refraction. Default: 288.15.
+
+        Returns
+        -------
+        datetime.datetime
+
+        Notes
+        -----
+        Unlike utc_sunrise_sunset, this function always returns a
+        datetime.datetime object. If necessary, it goes back or forth several days until
+        it finds the event.
 
         Tested
         ------
         Moderately tested. Seems bug-free, but not 100% sure.
+
+        History
+        -------
+        2018-11-17 (AA): Bug-fix: Close to poles, last event can be up to a
+                         whole year away (was: half a year).
+        2018-11-17 (AA): Created this generic sub-function to last_sunrise,
+                         next_sunset, etc
     """
     # Idea
     # ====
@@ -265,58 +328,11 @@ def last_sunrise(d, lon, lat, alt=0, pres=None, temp=None):
     #    a sun rise, hence the while-loop.
 
     ###################################################
-    # CREATE SUN OBJECT                               #
+    # INPUT CHECK                                     #
     ###################################################
-    sun = ephem.Sun(d)
-
-    ###################################################
-    # CREATE OBSERVER OBJECT                          #
-    ###################################################
-    site = ephem.Observer()
-    site.lon = str(lon)
-    site.lat = str(lat)
-    site.elevation = alt
-    if pres is None:
-        site.compute_pressure()
-    else:
-        site.pressure = pres * 1e-2  # Pa --> hPa
-    if temp is not None:
-        site.temp = temp - 273.15    # K --> deg C
-    site.date = d
-
-    ###################################################
-    # FIND SUN RISE                                   #
-    ###################################################
-    # in extreme cases (close to the pole), the last sun rise may be up to half
-    # a year ago (<= 183 days).
-    d_try = d
-    d_inc = dt.timedelta(days=1)
-    count = 0
-    found = False
-    while not found:
-        try:
-            SR = site.previous_rising(sun).datetime()
-            found = True
-        except ephem.NeverUpError:
-            pass
-        except ephem.AlwaysUpError:
-            pass
-        count += 1
-        d_try = d_try - d_inc
-        assert count < 184        # (d) half a year
-    return SR
-
-def last_sunset(d, lon, lat, alt=0, pres=None, temp=None):
-    """Return a dt.datetime.
-
-    For description, see last_sunrise
-    """
-    # for comments, see last_sunrise.
-
-    ###################################################
-    # CREATE SUN OBJECT                               #
-    ###################################################
-    sun = ephem.Sun(d)
+    event_name = event_name.lower()
+    allowed_event_names = ('next_sr', 'next_ss', 'last_sr', 'last_ss')
+    assert event_name in allowed_event_names
 
     ###################################################
     # CREATE OBSERVER OBJECT                          #
@@ -331,120 +347,53 @@ def last_sunset(d, lon, lat, alt=0, pres=None, temp=None):
         site.pressure = pres * 1e-2
     if temp is not None:
         site.temp = temp - 273.15
-    site.date = d
+    site.date = time
+
+    ###################################################
+    # EVENT FUNCTION & TIME INCREMENT                 #
+    ###################################################
+    # create a generic function `event_function` that points to the appropriate
+    # method of `site` for the specific event in question
+    if event_name == 'next_sr':
+        event_function = site.next_rising
+        increment = dt.timedelta(days=1)
+
+    elif event_name == 'next_ss':
+        event_function = site.next_setting
+        increment = dt.timedelta(days=1)
+
+    elif event_name == 'last_sr':
+        event_function = site.previous_rising
+        increment = dt.timedelta(days=-1)
+
+    elif event_name == 'last_ss':
+        event_function = site.previous_setting
+        increment = dt.timedelta(days=-1)
 
     ###################################################
     # FIND SUN RISE                                   #
     ###################################################
-    d_try = d
-    d_inc = dt.timedelta(days=1)
-    count = 0
+    # in extreme cases (close to the pole), the event in question may be up to a
+    # year away; thus the loop.
+
+    pivot = time
     found = False
     while not found:
+        # make sure it is not more than a year away
+        assert abs(pivot-time) <= dt.timedelta(days=366)
+
+        sun = ephem.Sun(pivot)
+        site.date = pivot
+
         try:
-            event = site.previous_setting(sun).datetime()
+            event = event_function(sun).datetime()
             found = True
         except ephem.NeverUpError:
             pass
         except ephem.AlwaysUpError:
             pass
-        count += 1
-        d_try = d_try - d_inc
-        assert count < 184
-    return event
 
-def next_sunrise(d, lon, lat, alt=0, pres=None, temp=None):
-    """Return a dt.datetime.
-
-    For description, see last_sunrise
-    """
-    # for comments, see last_sunrise.
-
-    ###################################################
-    # CREATE SUN OBJECT                               #
-    ###################################################
-    sun = ephem.Sun(d)
-
-    ###################################################
-    # CREATE OBSERVER OBJECT                          #
-    ###################################################
-    site = ephem.Observer()
-    site.lon = str(lon)
-    site.lat = str(lat)
-    site.elevation = alt
-    if pres is None:
-        site.compute_pressure()
-    else:
-        site.pressure = pres * 1e-2
-    if temp is not None:
-        site.temp = temp - 273.15
-    site.date = d
-
-    ###################################################
-    # FIND SUN RISE                                   #
-    ###################################################
-    d_try = d
-    d_inc = dt.timedelta(days=1)
-    count = 0
-    found = False
-    while not found:
-        try:
-            event = site.next_rising(sun).datetime()
-            found = True
-        except ephem.NeverUpError:
-            pass
-        except ephem.AlwaysUpError:
-            pass
-        count += 1
-        d_try = d_try - d_inc
-        assert count < 184
-    return event
-
-def next_sunset(d, lon, lat, alt=0, pres=None, temp=None):
-    """Return a dt.datetime.
-
-    For description, see last_sunrise
-    """
-    # For comments, see last_sunrise
-
-    ###################################################
-    # CREATE SUN OBJECT                               #
-    ###################################################
-    sun = ephem.Sun(d)
-
-    ###################################################
-    # CREATE OBSERVER OBJECT                          #
-    ###################################################
-    site = ephem.Observer()
-    site.lon = str(lon)
-    site.lat = str(lat)
-    site.elevation = alt
-    if pres is None:
-        site.compute_pressure()
-    else:
-        site.pressure = pres * 1e-2
-    if temp is not None:
-        site.temp = temp - 273.15
-    site.date = d
-
-    ###################################################
-    # FIND SUN RISE                                   #
-    ###################################################
-    d_try = d
-    d_inc = dt.timedelta(days=1)
-    count = 0
-    found = False
-    while not found:
-        try:
-            event = site.next_setting(sun).datetime()
-            found = True
-        except ephem.NeverUpError:
-            pass
-        except ephem.AlwaysUpError:
-            pass
-        count += 1
-        d_try = d_try - d_inc
-        assert count < 184
+        pivot = pivot + increment
     return event
 
 def fraction_of_day(time, sunrise, sunset):
@@ -567,3 +516,31 @@ def sun_position(d, lon, lat):
     altitude_deg = 180. / np.pi * altitude_rad
     azimuth_deg = 180. / np.pi * azimuth_rad
     return altitude_grad, azimuth_grad
+
+
+###################################################
+# TESTING                                         #
+###################################################
+if __name__ == '__main__':
+    lon = 0
+    lat = 85.
+    import datetime_utils as dt_utils
+    import matplotlib.pyplot as plt
+    import sys
+
+    time_beg = dt.datetime(2018, 1, 1)
+    time_end = dt.datetime(2019, 1, 1)
+    time_inc = dt.timedelta(1)
+    times = dt_utils.datetime_range(time_beg, time_end, time_inc)
+    N = len(times)
+    sunrises = [None] * N
+    for n, time in enumerate(times):
+        sys.stderr.write("\r%s" % str(time))
+        sunrise = last_sunrise(time, lon, lat)
+        sunrises[n] = sunrise
+
+    diffs = [(sunrises[n] - times[n]).days for n in range(N)]
+    plt.plot(times, sunrises)
+    plt.show()
+
+
