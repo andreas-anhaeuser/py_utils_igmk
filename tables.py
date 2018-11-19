@@ -14,6 +14,10 @@ Germany
 # standard modules
 import os
 import collections
+from copy import deepcopy as copy
+
+# PyPI modules
+import numpy as np
 
 _str_delims = ('"', "'")
 
@@ -269,8 +273,9 @@ def get_structured_namelist(lines, struc_sep='>', *args, **kwargs):
 
     return namelist
 
-def get_namelist(lines, name_end=':', sep=',', comment='#',
-        ignore_char=' ', convert_to_number=False, conversion_error=False,
+def get_namelist(
+        lines, name_end=':', sep=',', comment='#', ignore_char=' ',
+        convert_to_number=False, conversion_error=False,
         str_delims=_str_delims, strip_string_delimiters=True):
     """Convert list of lines to dict.
 
@@ -648,6 +653,73 @@ def get_column_list(*args, **kwargs):
     """Alias to read_column_list."""
     return read_column_list(*args, **kwargs)
 
+def read_column_list_with_headers(
+        filename, sep=None, comment_str='#', convert_to_number=False,
+        nan_str='nan'):
+    """Read text file structured in columns and return as dict.
+
+        Parameters
+        ----------
+        filename : str
+            path to text file
+        sep : None or str, optional
+            column separator, as in str.split(). Default: None
+        comment_str : str, optional
+            str indicating comments. Default: '#'
+        convert_to_number : bool, optional
+            column data are converted to numbers if this is possible for the
+            whole column
+        nan_str : str, optional
+            This string is converted to nan where applicable. Only in effect if
+            `convert_to_number` evaluates to True. Default: 'nan'
+
+        Returns
+        -------
+        cols : dict
+            keys are the header names
+
+        Raises
+        ------
+        KeyError
+            If a header appears multiple times
+        IndexError
+            If table contains less than two rows
+
+        Caution
+        -------
+        Make sure the header row does not contain `comment_str`.
+    """
+    dtype = float
+
+    cols = read_column_list(filename, sep=sep, comment_str=comment_str)
+
+    data = {}
+    for col in cols:
+        rows = col
+        if len(rows) < 2:
+            raise IndexError('Table contains less than 2 rows.')
+
+        header = rows[0]
+        values = rows[1:]
+
+        if convert_to_number:
+            # `nan_str` --> 'nan'
+            vals_tmp = copy(values)
+            for nval, val in enumerate(vals_tmp):
+                if val == nan_str:
+                    vals_tmp[nval] = 'nan'
+
+            # try to convert to floats
+            try:
+                values = np.array(vals_tmp, dtype=dtype)
+            except ValueError as e:
+                # not a purely numeric column
+                pass
+
+        data[header] = values
+
+    return data
+
 def read_column_list(filename, sep=None, skip_rows=0, comment_str='#'):
     """Read text file structured in columns and return as list of lists.
     
@@ -729,8 +801,19 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#'):
     return cols
 
 ###################################################
-# TESTING                                         #
+# TESTS                                           #
 ###################################################
+def get_column_list_with_headers___test_number_convertion():
+    filename = 'tables__test_file_column_list.txt'
+    sep = '|'
+    convert_to_number = True
+
+    data = read_column_list_with_headers(
+            filename, sep=sep, convert_to_number=convert_to_number)
+
+    for key in sorted(data):
+        print('%s: %s' % (key.ljust(32), str(data[key])))
+
+
 if __name__ == '__main__':
-    fn = '/home/anhaeus/acloud/aa_utils/setup.plot.lev_03.txt'
-    namelist = read_structured_namelist(fn)
+    get_column_list_with_headers___test_number_convertion()
