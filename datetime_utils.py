@@ -14,7 +14,6 @@ import calendar
 import collections
 import datetime as dt
 
-# PyPI modules
 import numpy as np
 
 #        ********************************************
@@ -257,11 +256,8 @@ class Season(object):
         False
        """
     def __init__(
-        self,
-        dt_start=dt.datetime(1, 1, 1),
-        dt_end=dt.datetime(1, 1, 1),
-        months='',
-        allow_whole_year=True
+            self, dt_start=dt.datetime(1, 1, 1), dt_end=dt.datetime(1, 1, 1),
+            months='', allow_whole_year=True
         ):
         """dt_start and dt_end must be dt.datetime or dt.date objects.
 
@@ -439,6 +435,85 @@ class Season(object):
             return True
         else:
             return False
+
+class Interval(object):
+    """A time interval.
+
+            Parameters
+            ----------
+            start : datetime.datetime
+            end : datetime.datetime
+            start_inclusive : bool, optional
+                Default: True
+            end_inclusive : bool, optional
+                Default: False
+        """
+    def __init__(self, start, end, start_inclusive=True, end_inclusive=False):
+        # input check
+        if not isinstance(start, dt.datetime):
+            raise TypeError('`start` must be datetime.datetime.')
+        if not isinstance(end, dt.datetime):
+            raise TypeError('`end` must be datetime.datetime.')
+
+        self.start = start
+        self.end = end
+
+        self.start_inclusive = start_inclusive
+        self.end_inclusive = end_inclusive
+
+    def __str__(self):
+        """Return a str."""
+        if self.start_inclusive:
+            lower_par = '['
+        else:
+            lower_par = '('
+        if self.end_inclusive:
+            upper_par = ']'
+        else:
+            upper_par = ')'
+
+        lower_bound = str(self.start)
+        upper_bound = str(self.end)
+
+        s = '%s%s, %s%s' % (lower_par, lower_bound, upper_bound, upper_par)
+        return s
+
+    def __repr__(self):
+        """Return a str."""
+        return 'Interval %s' % str(self)
+
+    def length(self):
+        """Return a datetime.timedelta."""
+        return self.end - self.start
+
+    def contains(self, time):
+        """Return a bool.
+
+            Check whether `time` is in the interval.
+
+            Parameters
+            ----------
+            time : datetime.datetime
+
+            Returns
+            -------
+            bool
+        """
+        if not isinstance(time, dt.datetime):
+            raise TypeError('`time` must be datetime.datetime.')
+
+        if self.start_inclusive:
+            lower_cond = self.start <= time
+        else:
+            lower_cond = self.start < time
+
+        if self.end_inclusive:
+            upper_cond = time <= self.end
+        else:
+            upper_cond = time < self.end
+
+        return (lower_cond and upper_cond)
+
 
 #        ********************************************
 #        *      helper functions to classes         *
@@ -1103,8 +1178,17 @@ def name_of_month(month, kind='full'):
 #        ********************************************
 if __name__ == "__main__":
     beg = dt.datetime(2017, 1, 1)
-    end = dt.datetime(2017, 1, 2)
-    inc = dt.timedelta(hours=6)
-    print(datetime_range(beg, end, inc))
-    print('')
-    print(datetime_range(end, beg, -inc))
+    end = dt.datetime(2017, 1, 2, 12, 3)
+
+    t1 = dt.datetime(2017, 1, 2, 2)
+    t2 = dt.datetime(2017, 1, 4, 2)
+    t3 = dt.datetime(2016, 1, 2, 2)
+
+    i = Interval(beg, end)
+    print(i)
+    print(i.length())
+    print(i.contains(t1))
+    print(i.contains(t2))
+    print(i.contains(t3))
+    print(repr(i))
+
