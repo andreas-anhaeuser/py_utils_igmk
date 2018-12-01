@@ -56,34 +56,40 @@ def distance_on_sphere(
         distance : float or array
             the shape is (shape1 + shape2), where shape1 is the shape of
             `longitude_1` and shape2 is the shape of `longitude_2`.
-
         
         History
         -------
-        2018-12-01 : (AA) Extension to arrays of arbitrary shape
+        2018-12-01 : (AA) Extention to arrays of arbitrary shape
         2014-2016 : (AA)
     """
     ###################################
     # INPUT CHECK                     #
     ###################################
-    if not isinstance(units, str):
-        raise TypeError("units must be 'deg' oder 'rad'.")
-
+    # ============ units  ================================ #
     known_units = ('deg', 'degrees', 'rad', 'radians')
-    if units.lower() not in known_units:
-        raise ValueError("units must be 'deg' oder 'rad'.")
+    message = "units must be 'deg' oder 'rad'."
 
+    if not isinstance(units, str):
+        raise TypeError(message)
+
+    if units.lower() not in known_units:
+        raise ValueError(message)
+
+    # ========== shapes  ================================= #
     shape_1 = np.shape(longitude_1)
     shape_2 = np.shape(longitude_2)
+
     if np.shape(latitude_1) != shape_1:
-        raise IndexError( 'Shapes of longitude_1 and latitude_1 must agree.')
+        raise IndexError('Shapes of longitude_1 and latitude_1 must agree.')
+
     if np.shape(latitude_2) != shape_2:
-        raise IndexError( 'Shapes of longitude_2 and latitude_2 must agree.')
+        raise IndexError('Shapes of longitude_2 and latitude_2 must agree.')
 
     ###################################
     # CONVERSIONS                     #
     ###################################
     if units.lower()[:1] == 'd':
+        # deg --> rad
         lon1 = np.radians(longitude_1)
         lat1 = np.radians(latitude_1)
         lon2 = np.radians(longitude_2)
@@ -94,61 +100,60 @@ def distance_on_sphere(
         lon2 = longitude_2
         lat2 = latitude_2
 
+    ###################################################
+    # ALGEBRAICALLY EXACT FUNCTION                    #
+    ###################################################
     dlon = np.add.outer(-lon1, lon2)
-    dlat = np.add.outer(-lat1, lat2)
-    
-    is_array = isinstance(dlon, np.ndarray)
-
-    ###################################################
-    # NOMENCLATURE                                    #
-    ###################################################
-    # ds : central angle (i. e. separation angle between the points)
-
-    ########################################
-    # CASE: LARGE ANGULAR SEPARATION       #
-    ########################################
-    # This is the algebraically exact function but it causes considerable
-    # rounding errors for small angles. 
-    # ds is the central angle (i. e. separation angle between the points)
     summand1 = np.multiply.outer(np.sin(lat1), np.sin(lat2))
     summand2 = np.multiply.outer(np.cos(lat1), np.cos(lat2)) * np.cos(dlon)
     S = summand1 + summand2
 
-    # numerical errors can lead to S > 1 (this is mathematically not possible,
-    # however)
-    if is_array:
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', RuntimeWarning)
-            S[S > 1] = 1.
-    elif S > 1:
-         S = 1.
+    # ========== correct for numerical errors  =========== #
+    # Numerical errors can lead to S > 1.
+    # This is mathematically not possible.
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', RuntimeWarning)
+        too_large = S > 1.
+
+    if np.sum(too_large) > 0:
+        if not isinstance(too_large, np.ndarray):
+             S = 1.
+        else:
+             S[too_large] = 1.
+    # ==================================================== #
+
+    # central angle (separation angle between the points)
     ds = np.arccos(S)
 
-    ########################################
-    # CASE: SMALL ANGULAR SEPARATION     #
-    ########################################
-    # for small central angles use haversine function (which avoids that
-    # rounding errors have large influence)
-    summand1 = (np.sin(dlat / 2.))**2
-    prod = np.multiply.outer(np.cos(lat1), np.cos(lat2))
-    summand2 = prod * (np.sin(dlon / 2.))**2
-    ds_hav = 2 * np.arcsin(np.sqrt(summand1 + summand2))
+    ###################################################
+    # Handle small angular separation                 #
+    ###################################################
+    # For small central angles, the above algeraically exact function causes
+    # numerical errors.
+    # --> Use better suited haversine function for small angles.
         
-    ###################################################
-    # REPLACE ds BY ds_small IF ds IS SMALL           #
-    ###################################################
-    # If ds is array-like, change appropriate elements of ds (in this case,
-    # ds_is_small is a bool matrix). If ds is a scalar, then ds_is_small is a
-    # bool.
+    # check for small angles
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', RuntimeWarning)
         ds_is_small = ds < 1e-3
-    if is_array:
-        ds[ds_is_small] = ds_hav[ds_is_small]
-    elif ds_is_small:
-        ds = ds_hav
+
+    # ========== correct small angles  =================== #
+    if np.sum(ds_is_small) > 0:
+        # compute the haversine small angle
+        dlat = np.add.outer(-lat1, lat2)
+        summand1 = (np.sin(dlat / 2.))**2
+        prod = np.multiply.outer(np.cos(lat1), np.cos(lat2))
+        summand2 = prod * (np.sin(dlon / 2.))**2
+        ds_hav = 2 * np.arcsin(np.sqrt(summand1 + summand2))
+
+        if not isinstance(too_large, np.ndarray):
+            ds = ds_hav
+        else:
+            ds[ds_is_small] = ds_hav[ds_is_small]
+    # ==================================================== #
                 
-    return radius * ds
+    distance = radius * ds
+    return distance
 
 def nearest_neighbour_on_sphere(
         lon_point,
@@ -319,42 +324,6 @@ def radius_on_spheroid(
     denominator = (a    * np.cos(phi))**2 + (b    * np.sin(phi))**2
     return np.sqrt(numerator / denominator)
 
-
-###################################################
-# TESTING                                         #
-###################################################
-if __name__ == '__main__':
-    lons1 = np.arange(1., 1.001, 0.0001)
-    lats1 = np.arange(50., 50.001, 0.0001)
-    lons2 = np.arange(1., 2., 0.1)
-    lats2 = np.arange(50., 51., 0.1)
-    lon1 = lons1[0]
-    lat1 = lats1[0]
-    lon2 = lons2[-1]
-    lat2 = lats2[-1]
-
-    lons1_2d = np.random.random((2, 3))
-    lats1_2d = np.random.random((2, 3))
-    lons2_2d = np.random.random((4, 5))
-    lats2_2d = np.random.random((4, 5))
-
-    print('\n0d vs. 0d')
-    print(distance_on_sphere_old(lon1, lat1, lon2, lat2))
-    print(distance_on_sphere(lon1, lat1, lon2, lat2))
-
-    print('\n0d vs. 1d')
-    print(distance_on_sphere_old(lon1, lat1, lons2, lats2))
-    print(distance_on_sphere(lon1, lat1, lons2, lats2))
-
-    print('\n1d vs. 1d')
-    print(distance_on_sphere(lons1, lats1, lons2, lats2))
-
-    print('\n2d vs. 2d')
-    D = distance_on_sphere(lons1_2d, lats1_2d, lons2_2d, lats2_2d)
-    print(np.shape(D))
-    print(D)
-   
-
 ###################################################
 # DEPRECATED                                      #
 ###################################################
@@ -466,3 +435,46 @@ def distance_on_sphere_old(
         ds = ds_hav
                 
     return radius * ds
+
+###################################################
+# TESTING                                         #
+###################################################
+if __name__ == '__main__':
+    N1 = 10**3
+    N2 = 10**4
+    lons1 = np.arange(1., 100., 0.0001)[:N1]
+    lats1 = np.arange(50., 60., 0.0001)[:N1]
+    lons2 = np.arange(1., 100., 0.001)[:N2]
+    lats2 = np.arange(50., 60., 0.001)[:N2]
+    lon1 = lons1[0]
+    lat1 = lats1[0]
+    lon2 = lons2[-1]
+    lat2 = lats2[-1]
+
+    lons1_2d = np.random.random((2, 3))
+    lats1_2d = np.random.random((2, 3))
+    lons2_2d = np.random.random((4, 5))
+    lats2_2d = np.random.random((4, 5))
+
+    print('\n0d vs. 0d')
+    print(distance_on_sphere_old(lon1, lat1, lon2, lat2))
+    print(distance_on_sphere(lon1, lat1, lon2, lat2))
+
+    print('\n0d vs. 1d')
+    print(distance_on_sphere_old(lon1, lat1, lons2, lats2))
+    print(distance_on_sphere(lon1, lat1, lons2, lats2))
+
+    fold = lambda : distance_on_sphere_old(lon1, lat1, lons2, lats2)
+    fnew = lambda : distance_on_sphere(lon1, lat1, lons2, lats2)
+    test = np.prod(fold() == fnew())
+
+    print('\n1d vs. 1d')
+    print(distance_on_sphere(lons1, lats1, lons2, lats2))
+
+    print('\n2d vs. 2d')
+    f = lambda : distance_on_sphere(lons1_2d, lats1_2d, lons2_2d, lats2_2d)
+    D = f()
+    print(np.shape(D))
+    print(D)
+   
+
