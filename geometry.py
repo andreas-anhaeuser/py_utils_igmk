@@ -29,29 +29,38 @@ def distance_on_sphere(
         units='deg',
         radius=_earth_radius,
         ):
-    """Return distance between two points on a speherical surface.
+    """Return distance between points on a speherical surface.
     
         Parameters
         ----------
-        longitude_1 : float
-        latitude_1 : float
+        longitude_1 : float or array
+            arbitrary number of axes
+        latitude_1 : float or array
+            same shape as longtitude_1
         longitude_2 : float or array
+            arbitrary number of axes
         latitude_2 : float or array
+            same shape as longtitude_2
         units : str, optional
             'deg' or 'rad', refers to the first four parameters, default is
             'deg'.
-        sphere_radius : float or array, optional
-            radius of the sphere. Default: Earth radius in metres.
-
-        If longitude_2, latitude_2 and/or sphere_radius are given as an array,
-        they must all agree in their dimensions.
+        radius : float or array, optional
+            radius of the sphere. Default: Earth radius in metres. 
+            If `radius` is not scalar its dimensions must be compatible for
+            multiplication with an array of shape (shape1 + shape2), where
+            shape1 is the shape of `longitude_1` and shape2 is the shape of
+            `longitude_2`.
 
         Returns
         -------
-        float or array
+        distance : float or array
+            the shape is (shape1 + shape2), where shape1 is the shape of
+            `longitude_1` and shape2 is the shape of `longitude_2`.
+
         
         History
         -------
+        2018-12-01 : (AA) Extension to arrays of arbitrary shape
         2014-2016 : (AA)
     """
     ###################################
@@ -59,27 +68,37 @@ def distance_on_sphere(
     ###################################
     if not isinstance(units, str):
         raise TypeError("units must be 'deg' oder 'rad'.")
-    if units.lower() not in ['deg', 'degrees', 'rad', 'radians']:
+
+    known_units = ('deg', 'degrees', 'rad', 'radians')
+    if units.lower() not in known_units:
         raise ValueError("units must be 'deg' oder 'rad'.")
+
+    shape_1 = np.shape(longitude_1)
+    shape_2 = np.shape(longitude_2)
+    if np.shape(latitude_1) != shape_1:
+        raise IndexError( 'Shapes of longitude_1 and latitude_1 must agree.')
+    if np.shape(latitude_2) != shape_2:
+        raise IndexError( 'Shapes of longitude_2 and latitude_2 must agree.')
 
     ###################################
     # CONVERSIONS                     #
     ###################################
-    dr = np.pi / 180       # for conversion from deg to rad
-    if units.lower() in ['deg', 'degrees']:
-        lon1 = longitude_1 * dr
-        lat1 = latitude_1  * dr
-        lon2 = longitude_2 * dr
-        lat2 = latitude_2  * dr
+    if units.lower()[:1] == 'd':
+        lon1 = np.radians(longitude_1)
+        lat1 = np.radians(latitude_1)
+        lon2 = np.radians(longitude_2)
+        lat2 = np.radians(latitude_2)
     else:
         lon1 = longitude_1
         lat1 = latitude_1
         lon2 = longitude_2
         lat2 = latitude_2
 
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
+    dlon = np.add.outer(-lon1, lon2)
+    dlat = np.add.outer(-lat1, lat2)
     
+    is_array = isinstance(dlon, np.ndarray)
+
     ###################################################
     # NOMENCLATURE                                    #
     ###################################################
@@ -91,13 +110,13 @@ def distance_on_sphere(
     # This is the algebraically exact function but it causes considerable
     # rounding errors for small angles. 
     # ds is the central angle (i. e. separation angle between the points)
-    summand1 = np.sin(lat1) * np.sin(lat2)
-    summand2 = np.cos(lat1) * np.cos(lat2) * np.cos(dlon)
+    summand1 = np.multiply.outer(np.sin(lat1), np.sin(lat2))
+    summand2 = np.multiply.outer(np.cos(lat1), np.cos(lat2)) * np.cos(dlon)
     S = summand1 + summand2
 
     # numerical errors can lead to S > 1 (this is mathematically not possible,
     # however)
-    if isinstance(S, collections.Iterable):
+    if is_array:
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', RuntimeWarning)
             S[S > 1] = 1.
@@ -111,7 +130,8 @@ def distance_on_sphere(
     # for small central angles use haversine function (which avoids that
     # rounding errors have large influence)
     summand1 = (np.sin(dlat / 2.))**2
-    summand2 = np.cos(lat1) * np.cos(lat2) * (np.sin(dlon / 2.))**2
+    prod = np.multiply.outer(np.cos(lat1), np.cos(lat2))
+    summand2 = prod * (np.sin(dlon / 2.))**2
     ds_hav = 2 * np.arcsin(np.sqrt(summand1 + summand2))
         
     ###################################################
@@ -123,7 +143,7 @@ def distance_on_sphere(
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', RuntimeWarning)
         ds_is_small = ds < 1e-3
-    if isinstance(ds, collections.Iterable):
+    if is_array:
         ds[ds_is_small] = ds_hav[ds_is_small]
     elif ds_is_small:
         ds = ds_hav
@@ -299,25 +319,150 @@ def radius_on_spheroid(
     denominator = (a    * np.cos(phi))**2 + (b    * np.sin(phi))**2
     return np.sqrt(numerator / denominator)
 
+
 ###################################################
 # TESTING                                         #
 ###################################################
 if __name__ == '__main__':
-#     import aa_io.aa_radiosonde as rs
-#     time = dt.datetime(2011, 5, 3, 0, 0)
-#     coor = rs.get_coordinate_list(time)
-#     flon = np.array(coor['lon'])
-#     flat = np.array(coor['lat'])
-#     falt = np.array(coor['alt'])
-#     lon = flon[0]
-#     lat = flat[0]
-    lon = lons[-1]
-    lat = lats[-1]
-    D = distance_on_sphere(lon, lat, lons, lats)
-    flon = np.arange(-10, 10, 0.1)
-    flat = np.arange(40, 50, 0.1)
-    mlon, mlat = np.meshgrid(flon, flat)
-    X = nearest_neighbour_on_sphere_opt(lon, lat, mlon, mlat)
-    Y = nearest_neighbour_on_sphere(lon, lat, mlon, mlat)
-    
+    lons1 = np.arange(1., 1.001, 0.0001)
+    lats1 = np.arange(50., 50.001, 0.0001)
+    lons2 = np.arange(1., 2., 0.1)
+    lats2 = np.arange(50., 51., 0.1)
+    lon1 = lons1[0]
+    lat1 = lats1[0]
+    lon2 = lons2[-1]
+    lat2 = lats2[-1]
+
+    lons1_2d = np.random.random((2, 3))
+    lats1_2d = np.random.random((2, 3))
+    lons2_2d = np.random.random((4, 5))
+    lats2_2d = np.random.random((4, 5))
+
+    print('\n0d vs. 0d')
+    print(distance_on_sphere_old(lon1, lat1, lon2, lat2))
+    print(distance_on_sphere(lon1, lat1, lon2, lat2))
+
+    print('\n0d vs. 1d')
+    print(distance_on_sphere_old(lon1, lat1, lons2, lats2))
+    print(distance_on_sphere(lon1, lat1, lons2, lats2))
+
+    print('\n1d vs. 1d')
+    print(distance_on_sphere(lons1, lats1, lons2, lats2))
+
+    print('\n2d vs. 2d')
+    D = distance_on_sphere(lons1_2d, lats1_2d, lons2_2d, lats2_2d)
+    print(np.shape(D))
+    print(D)
    
+
+###################################################
+# DEPRECATED                                      #
+###################################################
+def distance_on_sphere_old(
+        longitude_1,
+        latitude_1,
+        longitude_2,
+        latitude_2,
+        units='deg',
+        radius=_earth_radius,
+        ):
+    """[Deprecated] Return distance between two points on a speherical surface.
+    
+        Parameters
+        ----------
+        longitude_1 : float
+        latitude_1 : float
+        longitude_2 : float or array
+        latitude_2 : float or array
+        units : str, optional
+            'deg' or 'rad', refers to the first four parameters, default is
+            'deg'.
+        sphere_radius : float or array, optional
+            radius of the sphere. Default: Earth radius in metres.
+
+        If longitude_2, latitude_2 and/or sphere_radius are given as an array,
+        they must all agree in their dimensions.
+
+        Returns
+        -------
+        float or array
+        
+        History
+        -------
+        2014-2016 : (AA)
+    """
+    ###################################
+    # INPUT CHECK                     #
+    ###################################
+    if not isinstance(units, str):
+        raise TypeError("units must be 'deg' oder 'rad'.")
+    if units.lower() not in ['deg', 'degrees', 'rad', 'radians']:
+        raise ValueError("units must be 'deg' oder 'rad'.")
+
+    ###################################
+    # CONVERSIONS                     #
+    ###################################
+    dr = np.pi / 180       # for conversion from deg to rad
+    if units.lower() in ['deg', 'degrees']:
+        lon1 = longitude_1 * dr
+        lat1 = latitude_1  * dr
+        lon2 = longitude_2 * dr
+        lat2 = latitude_2  * dr
+    else:
+        lon1 = longitude_1
+        lat1 = latitude_1
+        lon2 = longitude_2
+        lat2 = latitude_2
+
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    
+    ###################################################
+    # NOMENCLATURE                                    #
+    ###################################################
+    # ds : central angle (i. e. separation angle between the points)
+
+    ########################################
+    # CASE: LARGE ANGULAR SEPARATION       #
+    ########################################
+    # This is the algebraically exact function but it causes considerable
+    # rounding errors for small angles. 
+    # ds is the central angle (i. e. separation angle between the points)
+    summand1 = np.sin(lat1) * np.sin(lat2)
+    summand2 = np.cos(lat1) * np.cos(lat2) * np.cos(dlon)
+    S = summand1 + summand2
+
+    # numerical errors can lead to S > 1 (this is mathematically not possible,
+    # however)
+    if isinstance(S, collections.Iterable):
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', RuntimeWarning)
+            S[S > 1] = 1.
+    elif S > 1:
+         S = 1.
+    ds = np.arccos(S)
+
+    ########################################
+    # CASE: SMALL ANGULAR SEPARATION     #
+    ########################################
+    # for small central angles use haversine function (which avoids that
+    # rounding errors have large influence)
+    summand1 = (np.sin(dlat / 2.))**2
+    summand2 = np.cos(lat1) * np.cos(lat2) * (np.sin(dlon / 2.))**2
+    ds_hav = 2 * np.arcsin(np.sqrt(summand1 + summand2))
+        
+    ###################################################
+    # REPLACE ds BY ds_small IF ds IS SMALL           #
+    ###################################################
+    # If ds is array-like, change appropriate elements of ds (in this case,
+    # ds_is_small is a bool matrix). If ds is a scalar, then ds_is_small is a
+    # bool.
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', RuntimeWarning)
+        ds_is_small = ds < 1e-3
+    if isinstance(ds, collections.Iterable):
+        ds[ds_is_small] = ds_hav[ds_is_small]
+    elif ds_is_small:
+        ds = ds_hav
+                
+    return radius * ds
