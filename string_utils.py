@@ -8,6 +8,9 @@
     University of Cologne, Germany
 """
 
+# standard modules
+import sys
+
 # PyPI modules
 import numpy as np
 
@@ -280,23 +283,40 @@ def progress_bar_inner(fraction, length=77, fillcolor='', bgcolor=''):
 
 def get_frac_block(Neighths):
     """Return a unicode block element as str."""
-    # input check
+    # ========== INPUT CHECK  ============================ #
     if not isinstance(Neighths, int):
         raise TypeError('Neighths must be int.')
     if not 0 <= Neighths <= 8:
         raise ValueError('Neighths must be between 0 and 8.')
 
-    # special case: empty block element
+    # ========== SPECIAL CASE: EMPTY BLOCK ELEMENT  ====== #
     if Neighths == 0:
         return ' '
 
-    pos0 = 0x2588   # full block
+    # ========== COMPUTE UNICODE POSITION  =============== #
+    # starting point: completely filled block
+    pos0 = 0x2588
 
-    # account for every missing eighth:
-    inc = 8 - Neighths
-    pos = pos0 + inc    # e. g. \0x259a for 5 eighths
+    # increase position for each missing eighth
+    N_eighths_missing = 8 - Neighths
+    pos = pos0 + N_eighths_missing
 
-    return unichr(pos)
+    # ========== CONVERT TO UNICODE CHARACTER =============================== #
+    #
+    # The function that does this has different names in python2 and python3.
+    # --> Select the appropriate function and call it `convert_to_unicode`.
+
+    # major version
+    python_version = sys.version_info[0]    # (int)
+    if python_version <= 2:
+        convert_to_unicode = unichr
+    else:
+        convert_to_unicode = chr
+
+    character = convert_to_unicode(pos)
+    # ======================================================================= #
+
+    return character
 
 def get_frac_block_vertical(Neighths):
     """Return a unicode block element as str."""
