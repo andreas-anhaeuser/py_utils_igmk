@@ -492,6 +492,12 @@ class Chronometer(object):
                  _BOLD + module_name + _ENDC)
         self.warning(text)
 
+    def set_info(self, info=''):
+        """Change info string."""
+        if not isinstance(info, str):
+            raise TypeError('info must be str.')
+        self.info = info
+
     ###################################################
     # COUNT                                           #
     ###################################################
