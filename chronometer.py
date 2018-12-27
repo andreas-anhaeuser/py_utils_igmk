@@ -19,13 +19,14 @@
 # standard modules
 import os
 import datetime as dt
+import inspect
 import warnings
 
 # PyPI modules
 import numpy as np
 
 # local modules
-import string_utils
+from . import string_utils
 
 ###################################################
 # CONSTANTS                                       #
@@ -480,8 +481,12 @@ class Chronometer(object):
                 prefix + '(Type: ' + str(type) + ')')
         self.warning(text)
 
-    def debug_warning(self, module_name):
+    def debug_warning(self, module_name=None):
         """Issue a DEBUG-mode warning."""
+        # retrieve name of calling function
+        if module_name is None:
+            module_name = inspect.stack()[1][1]
+
         text = (_BOLD + _RED + 'DEBUG' + _ENDC +
                  '-mode in ' +
                  _BOLD + module_name + _ENDC)
