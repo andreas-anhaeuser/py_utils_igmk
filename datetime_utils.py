@@ -648,8 +648,6 @@ def date_range(beg, end, inc=None, season_of_year=None):
     """Return a list of dt.date. Behaves in analogy to datetime_range().
 
         Works as datetime_range(). Refer there for documentation. 
-        Note: If inc is not a multiple of a day, the function still works but
-        itmay return unanticipated results.
 
         Parameters
         ----------
@@ -658,7 +656,7 @@ def date_range(beg, end, inc=None, season_of_year=None):
         end : datetime.date
             exclusive
         inc : datetime.timedelta, optional
-            increment. Default: 1 day
+            increment. Must be a multiple of 1 day. Default: 1 day
         season_of_year: Season, optional
             Default: whole year
 
@@ -668,18 +666,38 @@ def date_range(beg, end, inc=None, season_of_year=None):
 
         History
         -------
+        2018-12-20 (AA): Force `inc` to be a multiple of 1 day
+        2018-01-04 (AA): Made `inc` an optional argument (default: 1 day).
         2017-12-30 (AA): Created
-        2017-01-04 (AA): Made `inc` an optional argument (default: 1 day).
     """
-    # default
+    # ========== default ================================= #
     if inc is None:
         inc = dt.timedelta(days=1)
 
+    # ========== input check ============================= #
+    # make sure inc is multiple of a day
+    if inc % dt.timedelta(days=1) != dt.timedelta():
+        raise ValueError('`inc` must be a multiple of 1 day.')
+
+    # ========== normalize bounds ======================== #
+    # make them datetime.datetime objects
+
+    # the start is always midnight
     time_beg = dt.datetime.combine(beg, dt.time())
-    time_end = dt.datetime.combine(end, dt.time())
+
+    # the end is set to midnight only if it is not already a dt.datetime
+    if isinstance(end, dt.datetime):
+        time_end = end
+    else:
+        time_end = dt.datetime.combine(end, dt.time())
+
+    # ========== construct the list ====================== #
     dtrange = datetime_range(
             beg=time_beg, end=time_end, inc=inc,
             season_of_year=season_of_year)
+
+    # ========== re-cast ================================= #
+    # convert to datetime.date objects
     return [t.date() for t in dtrange]
 
 def datetime_range(
