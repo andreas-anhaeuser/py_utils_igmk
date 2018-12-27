@@ -359,15 +359,18 @@ def get_namelist(
         ###################################################
         # NON-DATA LINE                                   #
         ###################################################
-        if not line.count(name_end) == 1:
+        if not name_end in line:
             continue
 
         ###################################################
         # SPLIT LINE                                      #
         ###################################################
-        name, data = line.split(name_end)
+        i = line.index(name_end)
+        name = line[:i]
+        data = line[i+E:]
+
         name = name.strip(ignore_char)
-        data = data.strip().strip(ignore_char)
+        data = data.strip('\n').strip(ignore_char)
 
         ###################################################
         # SPLIT DATA                                      #
