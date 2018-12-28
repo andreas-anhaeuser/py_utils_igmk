@@ -144,8 +144,8 @@ class Chronometer(object):
         self.total_count = total_count
         self.count = 0
 
-        self.header = header
-        self.info = info
+        self.header = str(header)
+        self.info = str(info)
 
         self.time_step = time_step
         self.start = now
@@ -204,6 +204,7 @@ class Chronometer(object):
         return end.strftime(_tfmt)
 
     def prefix_for_issue(self):
+        """Return a colored time stamp as str."""
         if not self.show_message_times:
             return ''
 
@@ -376,7 +377,7 @@ class Chronometer(object):
 
         # usermessage
         if usermessage is not None:
-            line = '\n' + usermessage + '\n'
+            line = '\n' + str(usermessage) + '\n'
             text = text + line
 
         return text
@@ -455,6 +456,8 @@ class Chronometer(object):
         self.show(usermessage=usermessage, force=force)
 
     def issue(self, text):
+        """Print time stamp and message."""
+        text = str(text)
         prefix = self.prefix_for_issue()
         self.update_screen(prefix + text)
         self.Nlines_last_message = 0
@@ -466,7 +469,7 @@ class Chronometer(object):
 
     def warning(self, message, prefix='WARNING: '):
         """Issue a warning."""
-        self.issue(_YELLOW + prefix+ _ENDC + message )
+        self.issue(_YELLOW + prefix+ _ENDC + str(message))
 
     def custom_warning(self, *args, **kwargs):
         """Overwrite default implementation."""
@@ -496,7 +499,10 @@ class Chronometer(object):
         """Change info string."""
         if not isinstance(info, str):
             raise TypeError('info must be str.')
-        self.info = info
+        self.info = str(info)
+
+    def get_info(self):
+        return self.info
 
     ###################################################
     # COUNT                                           #
