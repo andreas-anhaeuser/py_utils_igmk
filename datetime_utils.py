@@ -514,6 +514,10 @@ class Interval(object):
 
         return (lower_cond and upper_cond)
 
+    def get_bounds(self):
+        """Return a pair of datetime.datetime."""
+        return (self.start, self.end)
+
 
 #        ********************************************
 #        *      helper functions to classes         *
