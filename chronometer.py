@@ -20,13 +20,14 @@
 import os
 import datetime as dt
 import inspect
+import textwrap
 import warnings
 
 # PyPI modules
 import numpy as np
 
 # local modules
-from . import string_utils
+import string_utils
 
 ###################################################
 # CONSTANTS                                       #
@@ -435,12 +436,18 @@ class Chronometer(object):
         """Equivalent to self.increase_count(1)."""
         self.count += 1
 
-    def show(self, usermessage=None, force=None, mode=None):
+    def show(self, usermessage=None, force=None, mode=None, wrap=70):
         if force is None:
             if usermessage is None:
                 force = False
             else:
                 force = True
+
+        if wrap and usermessage is not None:
+            lines = textwrap.wrap(
+                    str(usermessage), int(wrap), break_on_hyphens=False
+                    )
+            usermessage = ''.join([line + '\n' for line in lines])
         
         now = dt.datetime.now()
         time_inactive = now - self.last_active
@@ -646,25 +653,25 @@ def short_time_string(seconds, sep=''):
             units = 'd'
     return '%s%s' % (string_utils.human_format(x, sep=sep), units)
 
-def short_time_string_no_frac(seconds, digits=2, sep=''):
+def short_time_string_no_frac(seconds, digits=3, sep=''):
     x = int(np.round(seconds))
     units = 's'
     # minutes
     if len(str(x)) > digits:
-        x /= 60
+        x //= 60
         units = 'm'
     # hours
     if len(str(x)) > digits:
-        x /= 60
+        x //= 60
         units = 'h'
     # days
     if len(str(x)) > digits:
-        x /= 24
+        x //= 24
         units = 'd'
     # years
     if len(str(x)) > digits:
-        x /= 365
-        units = 'y'
+        x //= 365
+        units = 'a'
     return '%s%s%s' % (str(x), sep, units)
 
 def count_string(count):
@@ -685,24 +692,5 @@ def count_string(count):
 # TESTING                                         #
 ###################################################
 if 1 and __name__ == '__main__':
-    N = 2**16
-    K = 10
-
-    for case in (0, 1):
-        if case == 0:
-            Nchrono = K * N
-            header = 'Chronometer'
-        elif case == 1:
-            Nchrono = K * N * 8/10
-            header = 'Chronometer (with wrong estimate of total loops)'
-
-        chrono = Chronometer(Nchrono, header=header)
-        for k in range(K):
-            chrono.issue('loop %i' % k)
-            for n in range(N):
-                chrono.loop()
-                chrono.show()
-
-                np.cos(np.cos(np.cos(1)))
-                
-        chrono.resumee('Done')
+    for n in range(15):
+        print(short_time_string_no_frac(0.2*10**n))
