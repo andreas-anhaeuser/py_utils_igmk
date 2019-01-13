@@ -8,7 +8,7 @@ import datetime as dt
 if __name__ == '__main__':
     from string_utils import human_format
 else:
-    from .string_utils import human_format
+    from string_utils import human_format
 
 class Timer(object):
     """Initialize stopped timer.
@@ -64,16 +64,17 @@ class Timer(object):
             started : None of dt.datetime
                 time when it was last started; None if currently stopped.
         """
-        self.reset()
+        self.elapsed = dt.timedelta()
+        self.started = None
 
     def __str__(self):
         """Return elapsed time as human readable string."""
-        secs = self.get()
+        secs = self.get('s')
         return str(human_format(secs)) + 's'
 
     def __repr__(self):
         """Return a str."""
-        elapsed = self.get()
+        elapsed = self.get('s')
         if self.is_running():
             state = 'running'
         else:
@@ -81,9 +82,10 @@ class Timer(object):
         return '%s Timer at %f seconds' % (state, elapsed)
 
     def reset(self):
-        """Return a stopped timer with zero elapsed time."""
-        self.elapsed = 0.
-        self.started = None
+        """Return a timer with zero elapsed time."""
+        self.elapsed = dt.timedelta()
+        if self.is_running():
+            self.started = dt.datetime.now()
         return self
 
     def start(self, ignore_running=False):
@@ -134,7 +136,7 @@ class Timer(object):
 
         # regular case
         now = dt.datetime.now()
-        diff = (now - self.started).total_seconds()
+        diff = now - self.started
         self.elapsed += diff
         self.started = None
         return self
@@ -147,13 +149,24 @@ class Timer(object):
         """Return a bool."""
         return self.started is None
 
-    def get(self):
+    def get(self, type='t'):
         """Return elapsed time in seconds as float."""
         if self.is_running():
             self.stop()
             self.start()
 
-        return self.elapsed
+        if type[:1] == 't':
+            return self.elapsed
+        elif type[:1] == 's':
+            return self.elapsed.total_seconds()
+        else:
+            raise ValueError(
+                    'Output type must be "(s)econds" or "(t)imedelta".'
+                    )
+
+    def get_start(self):
+        """Return a datetime.datetime."""
+        return self.started
 
     def show(self):
         """Print elapsed time and return self."""
@@ -169,10 +182,12 @@ class Timer(object):
             ----------
             elapsed : float or datetime.timedelta
         """
-        if isinstance(elapsed, dt.timedelta):
-            elapsed = elapsed.total_seconds()
+        if not isinstance(elapsed, dt.timedelta):
+            elapsed = dt.timedelta(seconds=float(elapsed))
 
-        self.elapsed = float(elapsed)
+        self.elapsed = elapsed
+        if self.is_running():
+            self.started = dt.datetime.now()
         return self
 
 
