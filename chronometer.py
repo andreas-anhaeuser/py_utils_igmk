@@ -18,6 +18,7 @@
 
 # standard modules
 import os
+import sys
 import datetime as dt
 import inspect
 import textwrap
@@ -27,7 +28,12 @@ import warnings
 import numpy as np
 
 # local modules
-import string_utils
+if __name__ == '__main__':
+    import string_utils
+    from timer import Timer
+else:
+    from . import string_utils
+    from .timer import Timer
 
 ###################################################
 # CONSTANTS                                       #
@@ -123,7 +129,7 @@ class Chronometer(object):
     ###################################################
     def __init__(
             self, total_count, time_step=0.03, header='', info='',
-            show_message_times=True,
+            show_message_times=True, file=None, print_colors=None,
             ):
         """Initialize.
 
@@ -142,6 +148,8 @@ class Chronometer(object):
         """
         now = dt.datetime.now()
 
+        self.file = file
+
         self.total_count = total_count
         self.count = 0
 
@@ -149,12 +157,20 @@ class Chronometer(object):
         self.info = str(info)
 
         self.time_step = time_step
-        self.start = now
-
-        self.last_active = now
         self.Nlines_last_message = 0
-        self.time_of_last_message = now
         self.show_message_times = show_message_times
+
+        # timers
+        self.global_timer = Timer().start()
+        self.last_active_timer = Timer().start()
+        self.last_message_timer = Timer()
+
+        if print_colors is None:
+            if self.file is None:
+                print_colors = True
+            else:
+                print_colors = False
+        self.print_colors = print_colors
 
         warnings.showwarning = self.custom_warning
 
@@ -193,7 +209,7 @@ class Chronometer(object):
         return now.strftime(_tfmt)
 
     def start_string(self):
-        start = self.start
+        start = self.global_timer.get_start()
         return start.strftime(_tfmt)
 
     def end_string(self):
@@ -209,18 +225,22 @@ class Chronometer(object):
         if not self.show_message_times:
             return ''
 
-        now = dt.datetime.now()
-        last = self.time_of_last_message
-        self.time_of_last_message = now
-        seconds_since_last = (now - last).total_seconds()
+        # absolute time
+        now_str = dt.datetime.now().strftime('%H:%M:%S')
 
-        now_str = now.strftime('%H:%M:%S')
-        # time_since_last_str = '{:3.0f}s'.format(seconds_since_last)
-        time_since_last_str = short_time_string_no_frac(
-                seconds_since_last, 2).rjust(3)
-        prefix = '%s [%s] ' % (now_str, time_since_last_str)
+        # difference to last message
+        diff = self.last_message_timer.get('s')
+        diff_str_inner = short_time_string_no_frac(diff, 2)
+        diff_str_full = '[%s]' % diff_str_inner.rjust(3)
+        self.last_message_timer.reset()
 
-        return _BLUE + prefix + _ENDC
+        # combine
+        prefix = '%s %s ' % (now_str, diff_str_full)
+
+        if self.print_colors:
+            return _BLUE + prefix + _ENDC
+        else:
+            return prefix
 
     def build_line(self, words, colors=[_BOLD, None, None, None]):
         line = ''
@@ -228,7 +248,7 @@ class Chronometer(object):
             width = _col_width[i] - 1
             color = colors[i]
             word = word.rjust(width) 
-            if color is not None:
+            if color is not None and self.print_colors:
                 word = color + word + _ENDC
             line = line + word + ' '
         line = line + '\n'
@@ -282,13 +302,19 @@ class Chronometer(object):
         indent = ' ' * _col_width[0]
         if self.header != '':
             length = sum(_col_width)
-            line = indent + _BLUE + self.header + _ENDC + '\n'
+            if self.print_colors:
+                line = indent + _BLUE + self.header + _ENDC + '\n'
+            else:
+                line = indent + self.header + '\n'
             text = text + line
 
         if self.info != '':
             lines = self.info.split('\n')
             for line in lines:
-                line = indent + line + _ENDC + '\n'
+                if self.print_colors:
+                    line = indent + line + _ENDC + '\n'
+                else:
+                    line = indent + line + '\n'
                 text = text + line
 
         text = text + '\n'
@@ -338,7 +364,10 @@ class Chronometer(object):
         words = ['', 'Total', 'Done', 'Remaining']
         colors = (_BOLD,) * len(words)
         line = self.build_line(words, colors=colors)
-        text = text + _BOLD + line + _ENDC
+        if self.print_colors:
+            line = _BOLD + line + _ENDC
+        text = text + line 
+
 
         _colors = (_BOLD, None, None, None)
 
@@ -385,9 +414,19 @@ class Chronometer(object):
 
     def update_screen(self, text):
         Nlines = self.Nlines_last_message
+        if self.file is not None:
+            fid = open(self.file, 'a')
+        else:
+            fid = None
+
         for nline in range(Nlines):
-            print(_UPWARD + _CLEARLINE + _UPWARD)
-        print(text)
+            print(_UPWARD + _CLEARLINE + _UPWARD, file=fid)
+        print(text, file=fid)
+
+        if self.file is not None:
+            fid = open(self.file, 'a')
+        else:
+            fid = None
 
         Nlines = text.count('\n')
         self.Nlines_last_message = Nlines + 1
@@ -404,7 +443,7 @@ class Chronometer(object):
 
     def time_done(self):
         """Return a dt.timedelta."""
-        return dt.datetime.now() - self.start
+        return self.global_timer.get('t')
 
     def time_todo(self):
         """Return a dt.timedelta."""
@@ -450,21 +489,32 @@ class Chronometer(object):
             usermessage = ''.join([line + '\n' for line in lines])
         
         now = dt.datetime.now()
-        time_inactive = now - self.last_active
-        if not force:
-            if time_inactive.total_seconds() < self.time_step:
-                return
+        inactive_sec = self.last_active_timer.get('s')
+        if inactive_sec < self.time_step and not force:
+            return
+        else:
+            self.last_active_timer.reset()
+
         text = self.get_status_text(usermessage=usermessage, mode=mode)
         self.update_screen(text)
-        self.last_active = now
 
     def loop_and_show(self, usermessage=None, force=None):
         self.loop()
         self.show(usermessage=usermessage, force=force)
 
-    def issue(self, text):
+    def issue(self, text, wrap=False):
         """Print time stamp and message."""
         text = str(text)
+        if wrap:
+            if isinstance(wrap, bool):
+                screen_size = os.popen('stty size', 'r').read().split()
+                wrap = int(screen_size[1]) - 16
+
+            lines = textwrap.wrap(
+                    text, wrap, break_on_hyphens=False
+                    )
+            text = ''.join([line + '\n' for line in lines])
+
         prefix = self.prefix_for_issue()
         self.update_screen(prefix + text)
         self.Nlines_last_message = 0
@@ -476,7 +526,10 @@ class Chronometer(object):
 
     def warning(self, message, prefix='WARNING: '):
         """Issue a warning."""
-        self.issue(_YELLOW + prefix+ _ENDC + str(message))
+        if self.print_colors:
+            self.issue(_YELLOW + prefix + _ENDC + str(message))
+        else:
+            self.issue(prefix + str(message))
 
     def custom_warning(self, *args, **kwargs):
         """Overwrite default implementation."""
@@ -485,7 +538,16 @@ class Chronometer(object):
         type = args[1]
         where = args[2]
         lineno = args[3]
-        message = warning.message
+
+        # ========== retrieve message =================== #
+        # how to do this depends on major python version
+        python_version = sys.version_info[0]    # (int)
+        if python_version <= 2:
+            message = warning.message
+        else:
+            message = warning.args[0]
+        # ================================================ #
+
         text = (message + ' in\n' +
                 prefix + str(lineno) + ':' + where + '\n' +
                 prefix + '(Type: ' + str(type) + ')')
@@ -497,9 +559,12 @@ class Chronometer(object):
         if module_name is None:
             module_name = inspect.stack()[1][1]
 
-        text = (_BOLD + _RED + 'DEBUG' + _ENDC +
-                 '-mode in ' +
-                 _BOLD + module_name + _ENDC)
+        if self.print_colors:
+            text = (_BOLD + _RED + 'DEBUG' + _ENDC
+                     + '-mode in '
+                     + _BOLD + module_name + _ENDC)
+        else:
+            text = 'DEBUG-mode in ' + module_name
         self.warning(text)
 
     def set_info(self, info=''):
@@ -692,5 +757,15 @@ def count_string(count):
 # TESTING                                         #
 ###################################################
 if 1 and __name__ == '__main__':
-    for n in range(15):
-        print(short_time_string_no_frac(0.2*10**n))
+    from time import sleep
+    filename = None
+    N = 20000
+    chrono = Chronometer(N, file=filename)
+    print(chrono.print_colors)
+    for i in range(N):
+        sleep(0.005)
+        chrono.show(str(i))
+        chrono.loop()
+
+    chrono.resumee()
+
