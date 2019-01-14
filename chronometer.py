@@ -128,7 +128,7 @@ class Chronometer(object):
     # INIT                                            #
     ###################################################
     def __init__(
-            self, total_count, time_step=0.03, header='', info='',
+            self, total_count, time_step=None, header='', info='',
             show_message_times=True, file=None, print_colors=None,
             ):
         """Initialize.
@@ -156,7 +156,15 @@ class Chronometer(object):
         self.header = str(header)
         self.info = str(info)
 
+        # time_step ----------------------------------
+        if time_step is None:
+            if self.file is None:
+                time_step = 0.03
+            else:
+                time_step = 1.
         self.time_step = time_step
+        # --------------------------------------------
+
         self.Nlines_last_message = 0
         self.show_message_times = show_message_times
 
@@ -413,23 +421,9 @@ class Chronometer(object):
         return text
 
     def update_screen(self, text):
-        Nlines = self.Nlines_last_message
-        if self.file is not None:
-            fid = open(self.file, 'a')
-        else:
-            fid = None
-
-        for nline in range(Nlines):
-            print(_UPWARD + _CLEARLINE + _UPWARD, file=fid)
-        print(text, file=fid)
-
-        if self.file is not None:
-            fid = open(self.file, 'a')
-        else:
-            fid = None
-
-        Nlines = text.count('\n')
-        self.Nlines_last_message = Nlines + 1
+        self.delete_lines(self.Nlines_last_message)
+        self.Nlines_last_message = text.count('\n') + 1
+        self._print(text)
 
     def fraction_done(self):
         total_count = self.total_count
@@ -467,6 +461,33 @@ class Chronometer(object):
     def speed(self):
         seconds_done = self.time_done().total_seconds()
         return self.count / seconds_done
+
+    def delete_lines(self, N=0):
+        N = int(N)
+        if N == 0:
+            return self
+        if N < 0:
+            raise ValueError()
+
+        if self.file is None:
+            deleter = N * (_UPWARD + _CLEARLINE) + _UPWARD
+            self._print(deleter)
+        else:
+            with open(self.file, 'r') as fid:
+                lines = fid.readlines()
+            with open(self.file, 'w') as fid:
+                for line in lines[:-N]:
+                    fid.write(line)
+
+        return self
+
+    def _print(self, text):
+        if self.file is None:
+            print(text)
+        else:
+            with open(self.file, 'a') as fid:
+                fid.write(text.encode('utf-8') + '\n')
+        return self
         
     ###################################################
     # USER FUNCTIONS                                  #
@@ -756,16 +777,21 @@ def count_string(count):
 ###################################################
 # TESTING                                         #
 ###################################################
-if 1 and __name__ == '__main__':
+def test():
     from time import sleep
-    filename = None
-    N = 20000
-    chrono = Chronometer(N, file=filename)
+    filename = '.tmp.log'
+    N = 2000
+    chrono = Chronometer(N, file=filename, print_colors=True)
     print(chrono.print_colors)
     for i in range(N):
+        if i % 100 == 0:
+            chrono.issue(i)
         sleep(0.005)
-        chrono.show(str(i))
-        chrono.loop()
+        # chrono.show(str(i))
+        chrono.loop_and_show()
 
     chrono.resumee()
 
+
+if 1 and __name__ == '__main__':
+    test()
