@@ -5,7 +5,7 @@
 import datetime as dt
 
 # local modules
-import string_utils as su
+from .. import string_utils as su
 
 _col_widths = [25, 21, 21, 12]
 

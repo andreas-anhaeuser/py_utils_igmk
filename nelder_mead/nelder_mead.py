@@ -60,7 +60,7 @@ import numpy as np
 from scipy.optimize import OptimizeResult
 
 # local modules
-import nelder_mead_messages as messages
+from . import messages
 
 _alpha = 1.     # reflection factor
 _gamma = 2.     # expansion factor
