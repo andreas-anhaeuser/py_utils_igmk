@@ -1,14 +1,14 @@
 #!/usr/bin/python
 """String table utilities.
 
-Author
-------
-Written in 2016
-by Andreas Anhaeuser
-Insitute for Geophysics and Meteorology
-University of Cologne
-Germany
-<anhaeus@meteo.uni-koeln.de>
+    Author
+    ------
+    Andreas Anhaeuser
+    Insitute for Geophysics and Meteorology
+    University of Cologne
+    Germany
+    <andreas.anhaeuser@uni-koeln.de>
+    <andreas.anhaeuser@posteo.net> (after expiry the above)
 """
 
 # standard modules
@@ -63,14 +63,9 @@ def read_vartable(filename, sep='|', comment='#', ignore_str=' '):
         varname3    | ncvn3   |    1 |    200 
 
 
-        Author
+        History
         ------
         Written in 2016
-        by Andreas Anhaeuser
-        Institute for Geophysics and Meteorology
-        University of Cologne
-        Germany
-        <anhaeus@meteo.uni-koeln.de>
     """
     if not os.path.isfile(filename):
         raise IOError('Cannot access file ' + filename)
@@ -206,14 +201,9 @@ def read_namelist(filename, *args, **kwargs):
         'average temperature' : '9.7',
         }
 
-        Author
-        ------
-        Written in 2016-2018
-        by Andreas Anhaeuser
-        Institute for Geophysics and Meteorology
-        University of Cologne
-        Germany
-        <anhaeus@meteo.uni-koeln.de>
+        History
+        -------
+        Written in 2016-2019
     """
     if not os.path.isfile(filename):
         raise IOError('Cannot access file ' + filename)
@@ -302,7 +292,18 @@ def get_namelist(
         -------
         table : dict
             keys are the header
+
+        Known bugs
+        ----------
+        String delimiters and lists
+            Lists of elements that are surrounded by string delimiters (eg. ' )
+            are not correctly parsed. For example:
+                    parameter : 'value_1', 'value_2'
+            is NOT parsed into {'parameter' : ['value_1', 'value_2']} You can
+            get the correct behaviour by omitting the string delimiter ' if
+            possible.
         
+
         Example
         -------
         An ascii file like this
@@ -323,15 +324,6 @@ def get_namelist(
         'area code' : '030',
         'average temperature' : '9.7',
         }
-
-        Author
-        ------
-        Written in 2016-2018
-        by Andreas Anhaeuser
-        Institute for Geophysics and Meteorology
-        University of Cologne
-        Germany
-        <anhaeus@meteo.uni-koeln.de>
     """
     ###################################################
     # INITIALIZE                                      #
@@ -470,14 +462,9 @@ def column_list(headers, data, typ='s', align='l',
         -------
         str
 
-        Author
-        ------
+        History
+        -------
         Written in 2016
-        by Andreas Anhaeuser
-        Insitute for Geophysics and Meteorology
-        University of Cologne
-        Germany
-        <anhaeus@meteo.uni-koeln.de>
     """
     ###################################################
     # INPUT CHECK                                     #
