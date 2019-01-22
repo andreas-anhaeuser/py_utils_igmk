@@ -13,10 +13,75 @@ from __future__ import print_function
 # standard modules
 import os
 
+class Record(object):
+    """A class that facilitates use of the basic functions.
+    
+        Parameters
+        ----------
+        filename : str
+            record file
+        create_multiple_appearances : bool, optional
+            (default: False) add entry another time if it is already in the
+            file.
+        remove_multiple_appearances : bool, optional
+            (default: True) remove all appearances of entry if it exists
+            multiple times
+    """
+    def __init__(
+            self, filename, create_multiple_appearances=False,
+            remove_multiple_appearances=None,
+            ):
+        if not isinstance(filename, str):
+            raise TypeError('filename must be str.')
+        if not isinstance(create_multiple_appearances, bool):
+            raise TypeError('create_multiple_appearances must be str.')
+        if remove_multiple_appearances is None:
+            remove_multiple_appearances = not create_multiple_appearances
+        if not isinstance(remove_multiple_appearances, bool):
+            raise TypeError('remove_multiple_appearances must be str.')
+
+        self.filename = filename
+        self.create_multiple_appearances = create_multiple_appearances
+        self.remove_multiple_appearances = remove_multiple_appearances
+
+    def __str__(self):
+        return '%i entries in %s' % (self.count_all(), self.filename)
+
+    def __repr__(self):
+        return 'Record with file %s' % self.filename
+
+    def add(self, entry):
+        """Add entry to record and return self."""
+        add(entry, self.filename, self.create_multiple_appearances)
+        return self
+
+    def contains(self, entry):
+        """Return a bool."""
+        return contains(entry, self.filename)
+
+    def remove(self, entry):
+        """Remove entry from record and return self."""
+        remove(entry, self.filename, self.remove_multiple_appearances)
+        return self
+
+    def count(self, entry):
+        """Return number of appearances in record as int."""
+        return count_appearances(entry, self.filename)
+
+    def count_all(self):
+        """Return number of entries (may be duplicate)."""
+        return count_all_entries(self.filename)
+
+    def count_unique_entries(self):
+        raise NotImplementedError()
+
+    def get_unique_entries(self):
+        raise NotImplementedError()
+
 ###################################################
 # USER FUNCTIONS                                  #
 ###################################################
-def add(entry, filename, allow_multiple_appearances=False):
+def add(entry, filename, create_multiple_appearances=False):
     """Append a line to the record file.
 
         Creates the record file autonomously if it does not exist.
@@ -27,7 +92,7 @@ def add(entry, filename, allow_multiple_appearances=False):
             record to be added
         filename : str
             record file
-        allow_multiple_appearances : bool, optional
+        create_multiple_appearances : bool, optional
             (default: False) add entry another time if it is already in the
             file.
 
@@ -39,7 +104,7 @@ def add(entry, filename, allow_multiple_appearances=False):
     # create if not already existing
     initialize(filename, overwrite=False)
 
-    if not allow_multiple_appearances:
+    if not create_multiple_appearances:
         if contains(entry, filename):
             return False
 
@@ -187,6 +252,62 @@ def find_first_appearance(entry, filename):
     else:
         return None
 
+def count_all_entries(filename):
+    """Return an int.
+        
+        Parameters
+        ----------
+        filename : str
+            record file
+
+        Returns
+        -------
+        count : int or None
+            number of records (may be duplicate)
+    """
+    # file does not exist --> False
+    if not os.path.isfile(filename):
+        return 0
+
+    # read file
+    with open(filename, 'r') as fid:
+        lines = fid.readlines()
+
+    return len(lines)
+
+def count_appearances(entry, filename):
+    """Return an int.
+        
+        Parameters
+        ----------
+        entry : str
+            search item
+        filename : str
+            record file
+
+        Returns
+        -------
+        count : int
+            number of appearances in file
+    """
+    # file does not exist --> False
+    if not os.path.isfile(filename):
+        return 0
+
+    # read file
+    with open(filename, 'r') as fid:
+        lines = fid.readlines()
+
+    # search contents
+    entry = str(entry).strip()
+    count = 0
+    for nline, line in enumerate(lines):
+        line = line.strip()
+        if entry == line:
+            count += 1
+
+    return count
+
 def initialize(filename, overwrite=True):
     """Create record file.
 
@@ -248,9 +369,39 @@ def test_write_and_look_up():
         found = contains(entry, filename)
         print('Entry %s in record file: %s' % (entry, found))
 
+def test_class_basic():
+    import datetime as dt
+    filename = '.tempdir/.record_file.tmp.txt'
+    entries = ['first', 2, dt.datetime.now(), ('a', 'tuple')]
+    record = Record(filename)
+
+    print('record file: %s' % filename)
+    for entry in entries:
+        print('*' * 30)
+
+        # look up
+        found = record.contains(entry)
+        print('Entry %s in record file: %s' % (entry, found))
+
+        # add
+        print('Add it.')
+        record.add(entry)
+
+        # look up again
+        found = record.contains(entry)
+        print('Entry %s in record file: %s' % (entry, found))
+
+    print('*' * 30)
+    for entry in entries:
+        # look up
+        found = record.contains(entry)
+        print('Entry %s in record file: %s' % (entry, found))
+
+    os.remove(filename)
+
 
 if __name__ == '__main__':
-    test_write_and_look_up()
+    test_class_basic()
 
 
 
