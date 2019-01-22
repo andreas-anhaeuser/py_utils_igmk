@@ -28,7 +28,7 @@ import numpy as np
 from netCDF4 import Dataset
 
 # local modules
-import string_utils as aa_str
+from . import string_utils as aa_str
 
 #################################################
 # FUNCTIONS USING VARTABLES                     #
@@ -772,7 +772,7 @@ def write_file(
                     '\nnckey: %s' % nckey,
                     '\nshape: %s' % str(np.shape(value)),
                     ])
-                print message
+                print(message)
                 raise e
 
             ###############################

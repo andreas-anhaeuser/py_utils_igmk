@@ -97,5 +97,5 @@ def paper_size(series='A', size=4, orientation='portrait', units='m'):
 if __name__ == '__main__':
     for series in string.ascii_lowercase[:8]:
         print ('%s4' % series), paper_size(series, 4)
-    print paper_size('A', 4.5)
-    print paper_size('A', -4.5)
+    print(paper_size('A', 4.5))
+    print(paper_size('A', -4.5))

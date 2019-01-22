@@ -5,10 +5,11 @@
 import datetime as dt
 
 # local modules
-if __name__ == '__main__':
-    from string_utils import human_format
-else:
-    from string_utils import human_format
+from .string_utils import human_format
+#if __name__ == '__main__':
+#    from string_utils import human_format
+#else:
+#    from .string_utils import human_format
 
 class Timer(object):
     """Initialize stopped timer.

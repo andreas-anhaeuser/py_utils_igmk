@@ -7,6 +7,9 @@
     - remove the record from the file
 """
 
+# if running in python2
+from __future__ import print_function
+
 # standard modules
 import os
 

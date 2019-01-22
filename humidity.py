@@ -37,7 +37,7 @@
 import numpy as np
 
 # local modules
-import meteo as met
+from . import meteo as met
 
 _epsilon = met._epsilon
 sat_press = met.water_vapor_saturation_pressure

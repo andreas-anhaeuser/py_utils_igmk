@@ -486,7 +486,8 @@ class Chronometer(object):
             print(text)
         else:
             with open(self.file, 'a') as fid:
-                fid.write(text.encode('utf-8') + '\n')
+                # fid.write((text + '\n').encode('utf-8'))
+                fid.write(text + '\n')
         return self
         
     ###################################################

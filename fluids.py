@@ -49,8 +49,8 @@
 # PyPI modules
 import numpy as np
 
-# own modules
-import meteo as met
+# local modules
+from . import meteo as met
 
 ###################################################
 # CONSTANTS                                       #
