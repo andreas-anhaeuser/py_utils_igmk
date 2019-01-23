@@ -171,7 +171,7 @@ class Chronometer(object):
         # timers
         self.global_timer = Timer().start()
         self.last_active_timer = Timer().start()
-        self.last_message_timer = Timer()
+        self.last_message_timer = Timer().start()
 
         if print_colors is None:
             if self.file is None:
@@ -781,6 +781,7 @@ def count_string(count):
 def test():
     from time import sleep
     filename = '.tmp.log'
+    filename = None
     N = 2000
     chrono = Chronometer(N, file=filename, print_colors=True)
     print(chrono.print_colors)
