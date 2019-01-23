@@ -238,12 +238,13 @@ class Chronometer(object):
 
         # difference to last message
         diff = self.last_message_timer.get('s')
-        diff_str_inner = short_time_string_no_frac(diff, 2)
-        diff_str_full = '[%s]' % diff_str_inner.rjust(3)
+        # diff_str_inner = short_time_string_no_frac(diff, 3)
+        diff_str_inner = nice_time_string(diff)
+        diff_str_full = '+%s' % diff_str_inner.rjust(4)
         self.last_message_timer.reset()
 
         # combine
-        prefix = '%s %s ' % (now_str, diff_str_full)
+        prefix = '%s [%s] ' % (diff_str_full, now_str)
 
         if self.print_colors:
             return _BLUE + prefix + _ENDC
@@ -739,6 +740,27 @@ def short_time_string(seconds, sep=''):
             x /= 24
             units = 'd'
     return '%s%s' % (string_utils.human_format(x, sep=sep), units)
+
+def nice_time_string(seconds):
+    """Return N.Mu or NNu or NNNu."""
+    value = seconds
+    units = 's'
+    if value > 300:
+        value /= 60
+        units = 'm'
+        if value > 300:
+            value /= 60
+            units = 'h'
+            if value > 100:
+                value /= 24
+                units = 'd'
+
+    if value >= 10:
+        fmt = '%1.0f'
+    else:
+        fmt = '%1.1f'
+
+    return fmt % value + units
 
 def short_time_string_no_frac(seconds, digits=3, sep=''):
     x = int(np.round(seconds))
