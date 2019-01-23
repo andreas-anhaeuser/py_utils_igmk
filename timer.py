@@ -5,11 +5,10 @@
 import datetime as dt
 
 # local modules
-from .string_utils import human_format
-#if __name__ == '__main__':
-#    from string_utils import human_format
-#else:
-#    from .string_utils import human_format
+if __name__ == '__main__':
+    from string_utils import human_format
+else:
+    from .string_utils import human_format
 
 class Timer(object):
     """Initialize stopped timer.
@@ -62,11 +61,14 @@ class Timer(object):
             ------
             elapsed : float
                 (s) elapsed time while running
-            started : None of dt.datetime
+            first_started : dt.datetime
+                time when it was first started
+            last_started : None of dt.datetime
                 time when it was last started; None if currently stopped.
         """
         self.elapsed = dt.timedelta()
-        self.started = None
+        self.first_started = dt.datetime.now()
+        self.last_started = None
 
     def __str__(self):
         """Return elapsed time as human readable string."""
@@ -85,8 +87,10 @@ class Timer(object):
     def reset(self):
         """Return a timer with zero elapsed time."""
         self.elapsed = dt.timedelta()
+        now = dt.datetime.now()
+        self.first_started = now
         if self.is_running():
-            self.started = dt.datetime.now()
+            self.last_started = now
         return self
 
     def start(self, ignore_running=False):
@@ -111,7 +115,7 @@ class Timer(object):
                 raise AlreadyRunningError(message)
 
         # regular case
-        self.started = dt.datetime.now()
+        self.last_started = dt.datetime.now()
         return self
 
     def stop(self, ignore_stopped=False):
@@ -137,9 +141,9 @@ class Timer(object):
 
         # regular case
         now = dt.datetime.now()
-        diff = now - self.started
+        diff = now - self.last_started
         self.elapsed += diff
-        self.started = None
+        self.last_started = None
         return self
 
     def is_running(self):
@@ -148,7 +152,7 @@ class Timer(object):
 
     def is_stopped(self):
         """Return a bool."""
-        return self.started is None
+        return self.last_started is None
 
     def get(self, type='t'):
         """Return elapsed time in seconds as float."""
@@ -167,7 +171,7 @@ class Timer(object):
 
     def get_start(self):
         """Return a datetime.datetime."""
-        return self.started
+        return self.first_started
 
     def show(self):
         """Print elapsed time and return self."""
@@ -188,7 +192,7 @@ class Timer(object):
 
         self.elapsed = elapsed
         if self.is_running():
-            self.started = dt.datetime.now()
+            self.last_started = dt.datetime.now()
         return self
 
 
