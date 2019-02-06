@@ -43,6 +43,7 @@ class Record(object):
         self.filename = filename
         self.create_multiple_appearances = create_multiple_appearances
         self.remove_multiple_appearances = remove_multiple_appearances
+        initialize(filename, overwrite=False)
 
     def __str__(self):
         return '%i entries in %s' % (self.count_all(), self.filename)
