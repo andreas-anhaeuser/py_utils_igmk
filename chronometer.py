@@ -416,7 +416,7 @@ class Chronometer(object):
 
         # usermessage
         if usermessage is not None:
-            line = '\n' + str(usermessage) + '\n'
+            line = '\n' + unicode(usermessage) + '\n'
             text = text + line
 
         return text
@@ -505,9 +505,9 @@ class Chronometer(object):
             else:
                 force = True
 
-        if wrap and usermessage is not None:
+        if wrap and (usermessage is not None):
             lines = textwrap.wrap(
-                    str(usermessage), int(wrap), break_on_hyphens=False
+                    unicode(usermessage), int(wrap), break_on_hyphens=False,
                     )
             usermessage = ''.join([line + '\n' for line in lines])
         
