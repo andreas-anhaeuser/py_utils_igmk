@@ -436,9 +436,10 @@ def str2num(s, str_delims=_str_delims):
 
     return number
 
-def column_list(headers, data, typ='s', align='l',
-        column_width=16, precision=7, filename=None,
-        comment_top=None, comment_bottom=None):
+def column_list(
+        headers, data, typ='s', align='l', column_width=16, precision=7,
+        filename=None, comment_top=None, comment_bottom=None,
+        ):
     """Write an ascii file with aligned columns.
 
         Parameters
@@ -448,7 +449,8 @@ def column_list(headers, data, typ='s', align='l',
         data : list of Iterable, length N
             The elements must be equal in length.
         typ : list of str, length N, optional
-            {'s', 'f', 'e', 'i'} (i. e. str, float or exponential) Default: all str
+            {'s', 'f', 'e', 'i'} (i. e. str, float or exponential) Default: all
+            str
         align : list of str, length N, optional
             {'l', 'c', 'r'} (i. e. left, center or right). Default: all left
         column_width : list of int, length N, optional
@@ -645,7 +647,7 @@ def get_column_list(*args, **kwargs):
 
 def read_column_list_with_headers(
         filename, sep=None, comment_str='#', convert_to_number=False,
-        nan_str='nan'):
+        nan_str='nan', skip_invalid_rows=False):
     """Read text file structured in columns and return as dict.
 
         Parameters
@@ -681,7 +683,8 @@ def read_column_list_with_headers(
     """
     dtype = float
 
-    cols = read_column_list(filename, sep=sep, comment_str=comment_str)
+    cols = read_column_list(filename, sep=sep, comment_str=comment_str,
+            skip_invalid_rows=skip_invalid_rows)
 
     data = {}
     for col in cols:
@@ -710,7 +713,8 @@ def read_column_list_with_headers(
 
     return data
 
-def read_column_list(filename, sep=None, skip_rows=0, comment_str='#'):
+def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
+        skip_invalid_rows=False):
     """Read text file structured in columns and return as list of lists.
     
         Parameters
@@ -740,6 +744,9 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#'):
     assert isinstance(skip_rows, int)
     assert skip_rows >= 0
 
+    if comment_str is None:
+        comment_str = ''
+
     ###################################################
     # READ FILE                                       #
     ###################################################
@@ -751,7 +758,7 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#'):
     # RETRIEVE COLUMNS                                #
     ###################################################
     init = False
-    for line in lines:
+    for nline, line in enumerate(lines):
         # skip_rows
         if skip_rows > 0:
             skip_rows -= 1
@@ -782,7 +789,14 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#'):
             N = len(words)
             init = True
 
-        assert len(words) == N
+        if len(words) != N:
+            if skip_invalid_rows:
+                continue
+            else:
+                raise Exception(
+                        'Row contains %i columns, but should be %i.' 
+                        % (len(words), N)
+                        )
 
         for n in range(N):
             word = words[n].strip()
