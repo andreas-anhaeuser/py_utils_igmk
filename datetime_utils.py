@@ -704,13 +704,7 @@ def date_range(beg, end, inc=None, season_of_year=None):
     # convert to datetime.date objects
     return [t.date() for t in dtrange]
 
-def datetime_range(
-        beg,
-        end,
-        inc,
-        season_of_year=None,
-        daytime_period=None,
-        ):
+def datetime_range(beg, end, inc, season_of_year=None, daytime_period=None):
     """Return a list of dt.datetime. Works in analogy to range().
 
         The function works similar to the standard range() function and is
@@ -791,6 +785,78 @@ def datetime_range(
             out.append(d)
         d += inc
     return out
+
+def month_range(beg, end, inc=1):
+    """Return a list of dt.datetime. Works in analogy to range().
+
+        The function works similar to the standard range() function and is
+        intended to be an extension of it to datetime objects.
+
+        Parameters
+        ----------
+        beg : dt.datetime
+            inclusive
+        end : dt.datetime
+            exclusive
+        inc : int
+            (months) increment
+
+        History
+        -------
+        2019-02-07 (AA): Created
+    """
+    assert isinstance(beg, dt.date)
+    assert isinstance(end, dt.date)
+    assert isinstance(inc, int)
+    inc = int(inc)
+    assert inc > 0
+
+    times = []
+    time = beg
+    while time < end:
+        times.append(time)
+        year = time.year
+        month = time.month
+        for i in range(inc):
+            year, month = next_month(year, month)
+        time = time.replace(year=year, month=month)
+
+    return times
+
+def year_range(beg, end, inc=1):
+    """Return a list of dt.datetime. Works in analogy to range().
+
+        The function works similar to the standard range() function and is
+        intended to be an extension of it to datetime objects.
+
+        Parameters
+        ----------
+        beg : dt.datetime
+            inclusive
+        end : dt.datetime
+            exclusive
+        inc : int
+            (years) increment
+
+        History
+        -------
+        2019-02-07 (AA): Created
+    """
+    assert isinstance(beg, dt.date)
+    assert isinstance(end, dt.date)
+    assert isinstance(inc, int)
+    inc = int(inc)
+    assert inc > 0
+
+    times = []
+    time = beg
+    while time < end:
+        times.append(time)
+        year = times.year
+        time = time.replace(year=year+inc)
+
+    return times
+
 
 ###################################################
 # unixtime (seconds since ...)                    #
@@ -1126,6 +1192,26 @@ def next_month(year, month):
         year += 1
     return year, month
 
+def previous_month(year, month):
+    """Return (year, month) of the previous month.
+    
+        Parameters
+        ----------
+        year : int
+        month : int
+        
+        Returns
+        -------
+        year_prev : int
+        month_prev : int
+    """
+    if month >= 1:
+        month -= 1
+    else:
+        month = 12
+        year -= 1
+    return year, month
+
 def next_day(year, month, day):
     """Return (year, month, day) of the following day.
     
@@ -1147,6 +1233,33 @@ def next_day(year, month, day):
     m = nextday.month
     d = nextday.day
     return y, m, d
+
+def add_months(time, number=1):
+    """Increase by number of months."""
+    assert isinstance(time, dt.date)
+    assert isinstance(number, int)
+    number = int(number)
+    assert number >= 0
+
+    year = time.year
+    month = time.month
+    if number >= 0:
+        for n in range(number):
+            year, month = next_month(year, month)
+    else:
+        for n in range(number):
+            year, month = previous_month(year, month)
+    return time.replace(year=year, month=month)
+
+def add_years(time, number):
+    """Increase by number of years."""
+    assert isinstance(time, dt.date)
+    assert isinstance(number, int)
+    number = int(number)
+
+    year = time.year
+    return time.replace(year=year+number)
+
 
 ###################################################
 # STRINGS                                         #
