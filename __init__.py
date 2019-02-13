@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from . import chronometer
+from . import datetime_classes
 from . import datetime_utils
 from . import fluids
 from . import geometry
