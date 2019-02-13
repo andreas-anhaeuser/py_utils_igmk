@@ -66,12 +66,14 @@ _CLEARLINE  = '\033[K'  # erase to end of line
 _SAVECRS = '\033[s'     # save curser position
 _RESTORECRS = '\033[u'  # restore curser position
 
+_default_warning = warnings.showwarning
+
 ###################################################
 # CLASS                                           #
 ###################################################
 class Chronometer(object):
     """A performance info screen for expensive loops.
-    
+
         This is used to show performance info on screen during execution of
         time-consuming loops. The (approximate) number of iterations must be
         known beforehand.
@@ -105,7 +107,7 @@ class Chronometer(object):
         >>> for n in range(N):
         ...    chrono.loop()
         ...    do_something_easy()
-        ...    
+        ...
         ...    # special case: jump to next loop before doing anything
         ...    # expensive
         ...    if something_extraordinary():
@@ -183,6 +185,155 @@ class Chronometer(object):
         warnings.showwarning = self.custom_warning
 
     ###################################################
+    # USER FUNCTIONS                                  #
+    ###################################################
+    def loop(self):
+        """Equivalent to self.increase_count(1)."""
+        self.count += 1
+
+    def show(self, usermessage=None, force=None, mode=None, wrap=70):
+        if force is None:
+            if usermessage is None:
+                force = False
+            else:
+                force = True
+
+        python_version = sys.version_info[0]    # (int)
+        if python_version < 3:
+            usermessage = unicode(usermessage)
+
+        if wrap and (usermessage is not None):
+            lines = textwrap.wrap(
+                    usermessage, int(wrap), break_on_hyphens=False,
+                    )
+            usermessage = ''.join([line + '\n' for line in lines])
+
+        now = dt.datetime.now()
+        inactive_sec = self.last_active_timer.get('s')
+        if inactive_sec < self.time_step and not force:
+            return
+        else:
+            self.last_active_timer.reset()
+
+        text = self.get_status_text(usermessage=usermessage, mode=mode)
+        self.update_screen(text)
+
+    def loop_and_show(self, usermessage=None, force=None):
+        self.loop()
+        self.show(usermessage=usermessage, force=force)
+
+    def issue(self, text, wrap=False):
+        """Print time stamp and message."""
+        text = str(text)
+        if wrap:
+            if isinstance(wrap, bool):
+                screen_size = os.popen('stty size', 'r').read().split()
+                wrap = int(screen_size[1]) - 16
+
+            lines = textwrap.wrap(
+                    text, wrap, break_on_hyphens=False
+                    )
+            text = ''.join([line + '\n' for line in lines])
+
+        prefix = self.prefix_for_issue()
+        self.update_screen(prefix + text)
+        self.Nlines_last_message = 0
+        self.show(force=True)
+
+    def resumee(self, usermessage=None):
+        self.show(force=True, usermessage=usermessage,
+                mode='resumee',)
+        self.exit()
+        return self
+
+    def warning(self, message, prefix='WARNING: '):
+        """Issue a warning."""
+        if self.print_colors:
+            self.issue(_YELLOW + prefix + _ENDC + str(message))
+        else:
+            self.issue(prefix + str(message))
+
+    def custom_warning(self, *args, **kwargs):
+        """Overwrite default implementation."""
+        prefix = ' ' * 24
+        warning = args[0]
+        type = args[1]
+        where = args[2]
+        lineno = args[3]
+
+        # ========== retrieve message =================== #
+        # how to do this depends on major python version
+        python_version = sys.version_info[0]    # (int)
+        if python_version <= 2:
+            message = warning.message
+        else:
+            message = warning.args[0]
+        # ================================================ #
+
+        text = (message + ' in\n' +
+                prefix + str(lineno) + ':' + where + '\n' +
+                prefix + '(Type: ' + str(type) + ')')
+        self.warning(text)
+
+    def debug_warning(self, module_name=None):
+        """Issue a DEBUG-mode warning."""
+        # retrieve name of calling function
+        if module_name is None:
+            module_name = inspect.stack()[1][1]
+
+        if self.print_colors:
+            text = (_BOLD + _RED + 'DEBUG' + _ENDC
+                     + '-mode in '
+                     + _BOLD + module_name + _ENDC)
+        else:
+            text = 'DEBUG-mode in ' + module_name
+        self.warning(text)
+
+    def set_info(self, info=''):
+        """Change info string."""
+        if not isinstance(info, str):
+            raise TypeError('info must be str.')
+        self.info = str(info)
+
+    def get_info(self):
+        return self.info
+
+    def exit(self):
+        """Clean up."""
+        warnings.showwarning = _default_warning
+        return self
+
+    ###################################################
+    # COUNT                                           #
+    ###################################################
+    def set_count(self, c):
+        self.count = c
+
+    def get_count(self):
+        return self.count
+
+    def decrease_count(self, increment=1):
+        self.count -= increment
+
+    def increase_count(self, increment=1):
+        self.count += increment
+
+    ###################################################
+    # TOTAL COUNT                                     #
+    ###################################################
+    def set_total_count(self, c):
+        self.total_count = c
+
+    def get_total_count(self):
+        return self.total_count
+
+    def decrease_total_count(self, increment=1):
+        self.total_count -= increment
+
+    def increase_total_count(self, increment=1):
+        self.total_count += increment
+
+    ###################################################
     # HELPER FUNCTIONS                                #
     ###################################################
     def speed_string(self):
@@ -256,7 +407,7 @@ class Chronometer(object):
         for i, word in enumerate(words):
             width = _col_width[i] - 1
             color = colors[i]
-            word = word.rjust(width) 
+            word = word.rjust(width)
             if color is not None and self.print_colors:
                 word = color + word + _ENDC
             line = line + word + ' '
@@ -302,7 +453,7 @@ class Chronometer(object):
         ###################################################
         # initialize
         text = ''
-        words = [''] * len(_col_width) 
+        words = [''] * len(_col_width)
 
         # empty line
         text = text + '\n'
@@ -310,7 +461,6 @@ class Chronometer(object):
         # header line
         indent = ' ' * _col_width[0]
         if self.header != '':
-            length = sum(_col_width)
             if self.print_colors:
                 line = indent + _BLUE + self.header + _ENDC + '\n'
             else:
@@ -343,9 +493,9 @@ class Chronometer(object):
 
         # second line
         if mode == 'run':
-            colors = (_BOLD,  _GREEN, _BOLD, None)
+            colors = (_BOLD, _GREEN, _BOLD, None)
         elif mode == 'resumee':
-            colors = (_BOLD,  None, _BOLD, None)
+            colors = (_BOLD, None, _BOLD, None)
         words[0] = 'Now:'
         words[1] = self.now_string()
         words[2] = 'Speed:'
@@ -359,9 +509,9 @@ class Chronometer(object):
         words[2] = 'Inverse speed:'
         words[3] = self.inverse_speed_string()
         if mode == 'run':
-            colors = (_BOLD,  _YELLOW, _BOLD, None)
+            colors = (_BOLD, _YELLOW, _BOLD, None)
         elif mode == 'resumee':
-            colors = (_BOLD,  _GREEN, _BOLD, None)
+            colors = (_BOLD, _GREEN, _BOLD, None)
         line = self.build_line(words, colors=colors)
         text = text + line
 
@@ -375,7 +525,7 @@ class Chronometer(object):
         line = self.build_line(words, colors=colors)
         if self.print_colors:
             line = _BOLD + line + _ENDC
-        text = text + line 
+        text = text + line
 
 
         _colors = (_BOLD, None, None, None)
@@ -386,9 +536,9 @@ class Chronometer(object):
         words[2] = time_string(self.time_done())
         words[3] = time_string(self.time_todo())
         if mode == 'run':
-            colors = (_BOLD,  None, None, _YELLOW)
+            colors = (_BOLD, None, None, _YELLOW)
         elif mode == 'resumee':
-            colors = (_BOLD,  _GREEN, None, None)
+            colors = (_BOLD, _GREEN, None, None)
         line = self.build_line(words, colors=colors)
         text = text + line
 
@@ -493,148 +643,6 @@ class Chronometer(object):
                 # fid.write((text + '\n').encode('utf-8'))
                 fid.write(text + '\n')
         return self
-        
-    ###################################################
-    # USER FUNCTIONS                                  #
-    ###################################################
-    def loop(self):
-        """Equivalent to self.increase_count(1)."""
-        self.count += 1
-
-    def show(self, usermessage=None, force=None, mode=None, wrap=70):
-        if force is None:
-            if usermessage is None:
-                force = False
-            else:
-                force = True
-
-        python_version = sys.version_info[0]    # (int)
-        if python_version < 3:
-            usermessage = unicode(usermessage)
-
-        if wrap and (usermessage is not None):
-            lines = textwrap.wrap(
-                    usermessage, int(wrap), break_on_hyphens=False,
-                    )
-            usermessage = ''.join([line + '\n' for line in lines])
-        
-        now = dt.datetime.now()
-        inactive_sec = self.last_active_timer.get('s')
-        if inactive_sec < self.time_step and not force:
-            return
-        else:
-            self.last_active_timer.reset()
-
-        text = self.get_status_text(usermessage=usermessage, mode=mode)
-        self.update_screen(text)
-
-    def loop_and_show(self, usermessage=None, force=None):
-        self.loop()
-        self.show(usermessage=usermessage, force=force)
-
-    def issue(self, text, wrap=False):
-        """Print time stamp and message."""
-        text = str(text)
-        if wrap:
-            if isinstance(wrap, bool):
-                screen_size = os.popen('stty size', 'r').read().split()
-                wrap = int(screen_size[1]) - 16
-
-            lines = textwrap.wrap(
-                    text, wrap, break_on_hyphens=False
-                    )
-            text = ''.join([line + '\n' for line in lines])
-
-        prefix = self.prefix_for_issue()
-        self.update_screen(prefix + text)
-        self.Nlines_last_message = 0
-        self.show(force=True)
-
-    def resumee(self, usermessage=None):
-        self.show(force=True, usermessage=usermessage,
-                mode='resumee',)
-
-    def warning(self, message, prefix='WARNING: '):
-        """Issue a warning."""
-        if self.print_colors:
-            self.issue(_YELLOW + prefix + _ENDC + str(message))
-        else:
-            self.issue(prefix + str(message))
-
-    def custom_warning(self, *args, **kwargs):
-        """Overwrite default implementation."""
-        prefix = ' ' * 24
-        warning = args[0]
-        type = args[1]
-        where = args[2]
-        lineno = args[3]
-
-        # ========== retrieve message =================== #
-        # how to do this depends on major python version
-        python_version = sys.version_info[0]    # (int)
-        if python_version <= 2:
-            message = warning.message
-        else:
-            message = warning.args[0]
-        # ================================================ #
-
-        text = (message + ' in\n' +
-                prefix + str(lineno) + ':' + where + '\n' +
-                prefix + '(Type: ' + str(type) + ')')
-        self.warning(text)
-
-    def debug_warning(self, module_name=None):
-        """Issue a DEBUG-mode warning."""
-        # retrieve name of calling function
-        if module_name is None:
-            module_name = inspect.stack()[1][1]
-
-        if self.print_colors:
-            text = (_BOLD + _RED + 'DEBUG' + _ENDC
-                     + '-mode in '
-                     + _BOLD + module_name + _ENDC)
-        else:
-            text = 'DEBUG-mode in ' + module_name
-        self.warning(text)
-
-    def set_info(self, info=''):
-        """Change info string."""
-        if not isinstance(info, str):
-            raise TypeError('info must be str.')
-        self.info = str(info)
-
-    def get_info(self):
-        return self.info
-
-    ###################################################
-    # COUNT                                           #
-    ###################################################
-    def set_count(self, c):
-        self.count = c
-
-    def get_count(self):
-        return self.count
-
-    def decrease_count(self, increment=1):
-        self.count -= increment
-
-    def increase_count(self, increment=1):
-        self.count += increment
-
-    ###################################################
-    # TOTAL COUNT                                     #
-    ###################################################
-    def set_total_count(self, c):
-        self.total_count = c
-
-    def get_total_count(self):
-        return self.total_count
-
-    def decrease_total_count(self, increment=1):
-        self.total_count -= increment
-
-    def increase_total_count(self, increment=1):
-        self.total_count += increment
 
 class PerformanceInfo(Chronometer):
     """Alias to Chronometer."""
@@ -701,7 +709,7 @@ def time_string(x):
     # negative
     if x < dt.timedelta():
         return '-' + time_string(-x)
-    
+
     ###################################################
     # REGULAR CASE                                    #
     ###################################################
