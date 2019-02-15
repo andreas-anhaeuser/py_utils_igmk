@@ -55,18 +55,7 @@ class Record(object):
         return self.count_all()
 
     def __iter__(self):
-        self.entries = self.get_all()
-        self.n = 0
-        self.N = len(self.entries)
-        return self
-
-    def __next__(self):
-        if self.n < self.N:
-            item = self.entries[self.n]
-            self.n += 1
-            return item
-        else:
-            raise StopIteration
+        return self.get_all().__iter__()
 
     def add(self, entry):
         """Add entry to record and return self."""
