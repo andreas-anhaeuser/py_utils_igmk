@@ -57,6 +57,9 @@ class Record(object):
     def __iter__(self):
         return self.get_all().__iter__()
 
+    def __contains__(self, entry):
+        return self.contains(entry)
+
     def add(self, entry):
         """Add entry to record and return self."""
         add(entry, self.filename, self.create_multiple_appearances)
@@ -95,6 +98,24 @@ class Record(object):
             lines = fid.readlines()
 
         return [line.strip() for line in lines]
+
+    def sort(self):
+        # file does not exist --> False
+        if not os.path.isfile(self.filename):
+            return []
+
+        # read file
+        with open(self.filename, 'r') as fid:
+            lines = fid.readlines()
+
+        # sort
+        lines_sorted = sorted(lines)
+
+        # write file
+        with open(self.filename, 'w') as fid:
+            fid.writelines(lines_sorted)
+
+        return self
 
 
 ###################################################
