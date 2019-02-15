@@ -51,6 +51,23 @@ class Record(object):
     def __repr__(self):
         return 'Record with file %s' % self.filename
 
+    def __len__(self):
+        return self.count_all()
+
+    def __iter__(self):
+        self.entries = self.get_all()
+        self.n = 0
+        self.N = len(self.entries)
+        return self
+
+    def __next__(self):
+        if self.n < self.N:
+            item = self.entries[self.n]
+            self.n += 1
+            return item
+        else:
+            raise StopIteration
+
     def add(self, entry):
         """Add entry to record and return self."""
         add(entry, self.filename, self.create_multiple_appearances)
@@ -70,7 +87,7 @@ class Record(object):
         return count_appearances(entry, self.filename)
 
     def count_all(self):
-        """Return number of entries (may be duplicate)."""
+        """Return number of entries (may contain duplicates)."""
         return count_all_entries(self.filename)
 
     def count_unique_entries(self):
@@ -78,6 +95,18 @@ class Record(object):
 
     def get_unique_entries(self):
         raise NotImplementedError()
+
+    def get_all(self):
+        # file does not exist --> False
+        if not os.path.isfile(self.filename):
+            return []
+
+        # read file
+        with open(self.filename, 'r') as fid:
+            lines = fid.readlines()
+
+        return [line.strip() for line in lines]
+
 
 ###################################################
 # USER FUNCTIONS                                  #
