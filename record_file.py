@@ -243,7 +243,7 @@ def remove_once(entry, filename):
         lines = fid.readlines()
 
     # remove one line
-    reduced_lines = lines[:nline] + lines[nline+1]
+    reduced_lines = lines[:nline] + lines[nline+1:]
 
     # re-write file
     with open(filename, 'w') as fid:
