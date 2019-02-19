@@ -65,14 +65,12 @@ class Record(object):
         add(entry, self.filename, self.create_multiple_appearances)
         return self
 
+    def append(self, entry):
+        return self.add(entry)
+
     def contains(self, entry):
         """Return a bool."""
         return contains(entry, self.filename)
-
-    def remove(self, entry):
-        """Remove entry from record and return self."""
-        remove(entry, self.filename, self.remove_multiple_appearances)
-        return self
 
     def count(self, entry):
         """Return number of appearances in record as int."""
@@ -98,6 +96,11 @@ class Record(object):
             lines = fid.readlines()
 
         return [line.strip() for line in lines]
+
+    def remove(self, entry):
+        """Remove entry from record and return self."""
+        remove(entry, self.filename, self.remove_multiple_appearances)
+        return self
 
     def sort(self):
         # file does not exist --> False
@@ -247,8 +250,7 @@ def remove_once(entry, filename):
 
     # re-write file
     with open(filename, 'w') as fid:
-        for line in reduced_lines:
-            print(line, file=fid)
+        fid.writelines(reduced_lines)
 
     return True
 
