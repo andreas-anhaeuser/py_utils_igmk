@@ -223,6 +223,24 @@ def percentage_string(fraction, sep=' '):
     fmt = '%1.' + str(Ndig) + 'f' + sep + '%%'
     return (fmt % pc)
 
+def ordinal_str(number):
+    """Return '2nd'/'14th'/'0th', etc."""
+    assert isinstance(number, int)
+    number = int(number)
+    s = str(number)
+    last_digit = s[-1]
+    if s[-2:-1] == '1':
+        suffix = 'th'
+    elif last_digit == '1':
+        suffix = 'st'
+    elif last_digit == '2':
+        suffix = 'nd'
+    elif last_digit == '3':
+        suffix = 'rd'
+    else:
+        suffix = 'th'
+    return s + suffix
+
 ###################################################
 # PROGRESS BAR                                    #
 ###################################################
