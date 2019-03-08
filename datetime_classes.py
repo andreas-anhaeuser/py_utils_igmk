@@ -210,18 +210,18 @@ class DaytimePeriod(object):
         return cls(*bounds, allow_whole_day=allow_whole_day)
 
     def __repr__(self):
-        return str(self)
+        return 'DaytimePeriod ' + str(self)
 
     def __str__(self):
         """Return a str."""
         s = self.start.time()
         e = self.end.time()
         if s != e:
-            return 'DaytimePeriod [%s, %s)' % (s, e)
+            return '[%s, %s)' % (s, e)
         elif self.start == self.end:
-            return 'DaytimePeriod (empty)'
+            return '(empty)'
         else:
-            return 'DaytimePeriod (full day)'
+            return '(full day)'
 
     def __contains__(self, d):
         return self.contains(d)
@@ -449,7 +449,7 @@ class Season(object):
         return cls(*bounds, allow_whole_year=allow_whole_year)
 
     def __repr__(self):
-        return str(self)
+        return 'Season ' + str(self)
 
     def __str__(self):
         s = self.start.replace(year=1900)
@@ -464,7 +464,16 @@ class Season(object):
         if s.microsecond != 0 or e.microsecond != 0:
             add = ' %H:%M:%S.%f'
         fmt = fmt + add
-        text = 'Season from ' + s.strftime(fmt) + ' to ' + e.strftime(fmt)
+        beg_str = s.strftime(fmt)
+        end_str = e.strftime(fmt)
+
+        if s != e:
+            text = '[%s, %s)' % (beg_str, end_str)
+        elif self.start == self.end:
+            text = '(empty)'
+        else:
+            text = '(full year)'
+
         return text
 
     def __contains__(self, d):
