@@ -88,6 +88,23 @@ class Interval(object):
         """Return a pair of datetime.datetime."""
         return (self.start, self.end)
 
+    def overlaps(self, other):
+        """Return True if intervals overlap, False otherwise."""
+        if not isinstance(other, Interval):
+            raise TypeError('other must be Interval.')
+        if self._completely_earlier(other):
+            return False
+        if other._completely_earlier(self):
+            return False
+        return True
+
+    def _completely_earlier(self, other):
+        """Return a bool."""
+        if self.end_inclusive and other.start_inclusive:
+            return self.end < other.start
+        else:
+            return self.end <= other.start
+
 class DaytimePeriod(object):
     """A portion of the day cycle.
 
@@ -225,6 +242,10 @@ class DaytimePeriod(object):
 
     def __contains__(self, d):
         return self.contains(d)
+
+    def is_full_day(self):
+        """Return a bool."""
+        return self.length() == dt.timedelta(days=1)
 
     def length(self):
         """Return an instance of datetime.timedelta."""
