@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-import collections
 import datetime as dt
 
 class Interval(object):
@@ -95,8 +94,6 @@ class Interval(object):
 
     def __contains__(self, other):
         """Return a bool or a list of such."""
-        if isinstance(other, collections.Iterable):
-            return [self.__contains__(item) for item in other]
         if isinstance(other, Interval):
             return self._contains_interval(other)
         if isinstance(other, dt.datetime):
@@ -367,8 +364,6 @@ class DaytimePeriod(object):
 
     def __contains__(self, other):
         """Return a bool or a list of such."""
-        if isinstance(other, collections.Iterable):
-            return [self.__contains__(item) for item in other]
         if isinstance(other, dt.time):
           return self._contains_time(other)
         if isinstance(other, dt.datetime):
@@ -664,8 +659,6 @@ class Season(object):
 
     def __contains__(self, other):
         """Return a bool or a list of such."""
-        if isinstance(other, collections.Iterable):
-            return [self.__contains__(item) for item in other]
         if isinstance(other, Season):
             return self._contains_season(other)
         if isinstance(other, Interval):
