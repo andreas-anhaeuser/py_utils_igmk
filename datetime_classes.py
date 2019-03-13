@@ -104,6 +104,10 @@ class Interval(object):
             return self._contains_season(other)
         raise TypeError('Cannot compare to %s' % other.__class__)
 
+    def contains(self, other):
+        """Alias for backward compatibility."""
+        return self.__contains__(other)
+
     def length(self):
         """Return a datetime.timedelta."""
         return self.end - self.start
@@ -373,6 +377,10 @@ class DaytimePeriod(object):
         if isinstance(other, Interval):
             return self._contains_interval(other)
         raise TypeError('Cannot compare to %s' % other.__class__)
+
+    def contains(self, other):
+        """Alias for backward compatibility."""
+        return self.__contains__(other)
 
     def is_full_day(self):
         """Return a bool."""
@@ -666,6 +674,10 @@ class Season(object):
         if isinstance(other, dt.date):
             return self._contains_datetime(other)
         raise TypeError('Cannot compare to %s' % other.__class__)
+
+    def contains(self, other):
+        """Alias for backward compatibility."""
+        return self.__contains__(other)
 
     def months(self):
         """Return a string in the form of 'JJA' of 'Jun'.
