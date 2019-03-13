@@ -22,11 +22,55 @@ class Interval(object):
         if not isinstance(end, dt.datetime):
             raise TypeError('`end` must be datetime.datetime.')
 
+        # Do not allow intervals in reverse direction
+        if end < start:
+            raise ValueError('Reverse intervals not implemented')
+        elif end == start and end_inclusive and not start_inclusive:
+            raise ValueError('Reverse intervals not implemented')
+
         self.start = start
         self.end = end
 
         self.start_inclusive = start_inclusive
         self.end_inclusive = end_inclusive
+
+    def __lt__(self, other):
+        """Return True if strictly before, False otherwise.
+
+            Parameters
+            ----------
+            other : Interval or datetime.datetime
+
+            Returns
+            -------
+            bool
+                True if self is strictly before other, False otherwise.
+        """
+        if isinstance(other, Interval):
+            return self._completely_earlier(other)
+        elif isinstance(other, dt.datetime):
+            return self._ends_before(other)
+        else:
+            raise TypeError('Cannot compare to %s.' % other.__class__)
+
+    def __gt__(self, other):
+        """Return True if strictly after, False otherwise.
+
+            Parameters
+            ----------
+            other : Interval or datetime.datetime
+
+            Returns
+            -------
+            bool
+                True if self is strictly after other, False otherwise.
+        """
+        if isinstance(other, Interval):
+            return other < self
+        elif isinstance(other, dt.datetime):
+            return self._starts_after(other)
+        else:
+            raise TypeError('Cannot compare to %s.' % other.__class__)
 
     def __str__(self):
         """Return a str."""
@@ -49,14 +93,55 @@ class Interval(object):
         """Return a str."""
         return 'Interval %s' % str(self)
 
-    def __contains__(self, d):
-        return self.contains(d)
+    def __contains__(self, other):
+        """Return a bool or a list of such."""
+        if isinstance(other, collections.Iterable):
+            return [self.__contains__(item) for item in other]
+        if isinstance(other, Interval):
+            return self._contains_interval(other)
+        if isinstance(other, dt.datetime):
+            return self._contains_datetime(other)
+        if isinstance(other, DaytimePeriod):
+            return self._contains_daytime_period(other)
+        if isinstance(other, Season):
+            return self._contains_season(other)
+        raise TypeError('Cannot compare to %s' % other.__class__)
 
     def length(self):
         """Return a datetime.timedelta."""
         return self.end - self.start
 
-    def contains(self, time):
+    def get_bounds(self):
+        """Return a pair of datetime.datetime."""
+        return (self.start, self.end)
+
+    def overlaps(self, other):
+        """Return True if intervals overlap, False otherwise."""
+        if not isinstance(other, Interval):
+            raise TypeError('other must be Interval.')
+        if self < other:
+            return False
+        if self > other:
+            return False
+        return True
+
+    ############################################################
+    # helpers                                                  #
+    ############################################################
+    def _contains_interval(self, other):
+        if self.start_inclusive or (not other.start_inclusive):
+            lower_cond = self.start <= other.start
+        else:
+            lower_cond = self.start < other.start
+
+        if self.end_inclusive or (not other.end_inclusive):
+            upper_cond = other.end <= self.end
+        else:
+            upper_cond = other.end < self.end
+
+        return (lower_cond and upper_cond)
+
+    def _contains_datetime(self, time):
         """Return a bool.
 
             Check whether `time` is in the interval.
@@ -69,9 +154,6 @@ class Interval(object):
             -------
             bool
         """
-        if not isinstance(time, dt.datetime):
-            raise TypeError('`time` must be datetime.datetime.')
-
         if self.start_inclusive:
             lower_cond = self.start <= time
         else:
@@ -84,19 +166,59 @@ class Interval(object):
 
         return (lower_cond and upper_cond)
 
-    def get_bounds(self):
-        """Return a pair of datetime.datetime."""
-        return (self.start, self.end)
+    def _contains_daytime_period(self, period):
+        if self.length() >= dt.timedelta(days=1):
+            return True
+        speriod = DaytimePeriod.from_interval(self)
+        return speriod.__contains__(period)
 
-    def overlaps(self, other):
-        """Return True if intervals overlap, False otherwise."""
-        if not isinstance(other, Interval):
-            raise TypeError('other must be Interval.')
-        if self._completely_earlier(other):
-            return False
-        if other._completely_earlier(self):
-            return False
-        return True
+    def _contains_season(self, season):
+        length = self.length()
+        if length >= dt.timedelta(days=366):
+            return True
+        elif length > dt.timedelta(days=365):
+            raise NotImplementedError('Not straightforward due to leap years.')
+
+        s = Season.from_interval(self)
+        return s.__contains__(season)
+
+    def _ends_before(self, time):
+        """Return a bool.
+        
+            Parameters
+            ----------
+            time : datetime.datetime
+
+            Returns
+            -------
+            bool
+                True if `self` ends before `time`, False otherwise.
+        """
+        if not isinstance(time, dt.datetime):
+            raise TypeError('time must be datetime.datetime.')
+        if self.end_inclusive:
+            return self.end < time
+        else:
+            return self.end <= time
+
+    def _starts_after(self, time):
+        """Return a bool.
+        
+            Parameters
+            ----------
+            time : datetime.datetime
+
+            Returns
+            -------
+            bool
+                True if `self` start after `time`, False otherwise.
+        """
+        if not isinstance(time, dt.datetime):
+            raise TypeError('time must be datetime.datetime.')
+        if self.start_inclusive:
+            return self.start > time
+        else:
+            return self.start >= time
 
     def _completely_earlier(self, other):
         """Return a bool."""
@@ -133,7 +255,6 @@ class DaytimePeriod(object):
         >>> else:
         >>>     print 'It is night'
     """
-
     def __init__(self, dt_start=None, dt_end=None, allow_whole_day=True):
         """dt_start and dt_end must be dt.datetime or dt.time objects.
 
@@ -166,17 +287,13 @@ class DaytimePeriod(object):
 
             In all other cases allow_whole_day is ignored.
         """
-        #####################################
-        # DEFAULT                           #
-        #####################################
+        # default ------------------------------------
         if dt_start is None:
             dt_start = dt.datetime(1, 1, 1)
         if dt_end is None:
             dt_end = dt.datetime(1, 1, 1)
 
-        #####################################
-        # INPUT CHECK                       #
-        #####################################
+        # input check --------------------------------
         for d in (dt_start, dt_end):
             if not (isinstance(d, dt.datetime) or isinstance(d, dt.time)):
                 raise TypeError('dt_start and dt_end must be instances of ' +
@@ -184,49 +301,57 @@ class DaytimePeriod(object):
         if not isinstance(allow_whole_day, bool):
             raise TypeError('allow_whole_day must be a boolean.')
 
-        ####################################
-        # CONVERT TO dt.datetime           #
-        ####################################
-        if dt_start.__class__ is dt.time:
+        # convert to dt.datetime
+        # --------------------------------------------
+        if isinstance(dt_start, dt.time):
             start = dt.datetime.combine(dt.date(1, 1, 1), dt_start)
         else:
             start = dt_start
-        if dt_end.__class__ is dt.time:
+        if isinstance(dt_end, dt.time):
             end = dt.datetime.combine(dt.date(1, 1, 1), dt_end)
         else:
             end = dt_end
 
-        ####################################
-        # SHIFT TO YEAR 1                  #
-        ####################################
+        # shift to year 1
+        # --------------------------------------------
         # self.start will be on Jan 1st 0001 CE.
         # self.end will be between 0 and 1 day later than self.end, all will
         # thus be on Jan 1st or Jan 2nd in year 0001 CE.
         start = start.replace(1, 1, 1)
         end = end.replace(1, 1, 1)
 
-        ####################################
-        # CHECK SEQUENCE                   #
-        ####################################
+        # check sequence
+        # --------------------------------------------
         # make sure that end is not earlier that start:
         if end < start:
             end = end.replace(day=2)
         if end == start and allow_whole_day:
             end = end.replace(day=2)
 
-        ####################################
-        # CREATE FIELDS                    #
-        ####################################
+        # create fields ------------------------------
         self.start = start
         self.end = end
 
     @classmethod
-    def from_interval(cls, interval, allow_whole_day=True):
-        """Construct a Season from an Interval."""
+    def from_interval(cls, interval, allow_whole_day=None):
+        """Construct a Season from an Interval.
+            
+            interval : Interval
+            allow_whole_day : bool or None
+                if None, True is assumed for intervals of finite length
+        
+        """
+        if not isinstance(interval, Interval):
+            raise TypeError('Expected Interval, got %s' % interval.__class__)
+
+        if allow_whole_day is None:
+            allow_whole_day = interval.length() != 0
+
         bounds = interval.get_bounds()
         return cls(*bounds, allow_whole_day=allow_whole_day)
 
     def __repr__(self):
+        """Return a str."""
         return 'DaytimePeriod ' + str(self)
 
     def __str__(self):
@@ -240,8 +365,19 @@ class DaytimePeriod(object):
         else:
             return '(full day)'
 
-    def __contains__(self, d):
-        return self.contains(d)
+    def __contains__(self, other):
+        """Return a bool or a list of such."""
+        if isinstance(other, collections.Iterable):
+            return [self.__contains__(item) for item in other]
+        if isinstance(other, dt.time):
+          return self._contains_time(other)
+        if isinstance(other, dt.datetime):
+          return self._contains_time(other)
+        if isinstance(other, DaytimePeriod):
+          return self._contains_daytime_period(other)
+        if isinstance(other, Interval):
+            return self._contains_interval(other)
+        raise TypeError('Cannot compare to %s' % other.__class__)
 
     def is_full_day(self):
         """Return a bool."""
@@ -251,7 +387,44 @@ class DaytimePeriod(object):
         """Return an instance of datetime.timedelta."""
         return self.end - self.start
 
-    def contains(self, d):
+    def overlaps(self, other):
+        """Return a bool."""
+        if not isinstance(other, DaytimePeriod):
+            raise TypeError(
+                    'Expected DaytimePeriod, got %s' % other.__class__
+                    )
+        if self.start in other:
+            return True
+        if self.end in other:
+          return True
+        if other.start in self:
+          return True
+        if other.end in self:
+            return True
+        return False
+
+    ############################################################
+    # helpers                                                  #
+    ############################################################
+    def _contains_daytime_period(self, other):
+        """Return a bool."""
+        if self.start > other.start:
+            return False
+        if self.end < other.end:
+            return False
+        return True
+
+    def _contains_interval(self, interval):
+        """Return a bool."""
+        if interval.length() > self.length():
+            return False
+        if interval.end_inclusive and interval.end == self.end:
+            return False
+
+        period = DaytimePeriod.from_interval(interval)
+        return self.__contains__(period)
+
+    def _contains_time(self, d):
         """Check whether d is within DaytimePeriod or not.
 
             Parameters
@@ -262,19 +435,6 @@ class DaytimePeriod(object):
             -------
             bool or list of such
         """
-        ###################################################
-        # RECURSIVELY CALL FUNCTION                       #
-        ###################################################
-        if isinstance(d, collections.Iterable):
-            return [self.contains(dd) for dd in d]
-
-        ####################################
-        # INPUT CHECK                      #
-        ####################################
-        if d.__class__ not in (dt.datetime, dt.time):
-            raise TypeError(
-                    'Argument must be datetime.datetime or datetime.time.'
-                    )
 
         ####################################
         # CONVERT TO dt.datetime           #
@@ -356,8 +516,11 @@ class Season(object):
         False
        """
     def __init__(
-            self, dt_start=dt.datetime(1, 1, 1), dt_end=dt.datetime(1, 1, 1),
-            months='', allow_whole_year=True,
+            self,
+            dt_start=dt.datetime(1, 1, 1),
+            dt_end=dt.datetime(1, 1, 1),
+            months='',
+            allow_whole_year=True,
         ):
         """dt_start and dt_end must be dt.datetime or dt.date objects.
 
@@ -470,9 +633,11 @@ class Season(object):
         return cls(*bounds, allow_whole_year=allow_whole_year)
 
     def __repr__(self):
+        """Return a str."""
         return 'Season ' + str(self)
 
     def __str__(self):
+        """Return a str."""
         s = self.start.replace(year=1900)
         e = self.end.replace(year=1900)
 
@@ -497,8 +662,17 @@ class Season(object):
 
         return text
 
-    def __contains__(self, d):
-        return self.contains(d)
+    def __contains__(self, other):
+        """Return a bool or a list of such."""
+        if isinstance(other, collections.Iterable):
+            return [self.__contains__(item) for item in other]
+        if isinstance(other, Season):
+            return self._contains_season(other)
+        if isinstance(other, Interval):
+            return self._contains_interval(other)
+        if isinstance(other, dt.date):
+            return self._contains_datetime(other)
+        raise TypeError('Cannot compare to %s' % other.__class__)
 
     def months(self):
         """Return a string in the form of 'JJA' of 'Jun'.
@@ -522,37 +696,53 @@ class Season(object):
         """Return an instance of datetime.timedelta."""
         return self.end - self.start
 
-    def contains(self, d):
-        """Check whether d is within Season or not.
+    ############################################################
+    # helpers                                                  #
+    ############################################################
+    def _contains_season(self, other):
+        """Return a bool."""
+        if self.start > other.start:
+            return False
+        if self.end < other.end:
+            return False
+        return True
+
+    def _contains_interval(self, interval):
+        """Return a bool."""
+        if interval.length() > self.length():
+            return False
+        if interval.end_inclusive and interval.end == self.end:
+            return False
+
+        season = Season.from_interval(interval)
+        return self.__contains__(season)
+
+    def _contains_datetime(self, time):
+        """Check whether time is within Season or not.
 
             Parameters
             ----------
-            d : dt.datetime or dt.date or Iterable of such
+            time : dt.datetime or dt.date or Iterable of such
 
             Returns
             -------
             bool or list of such
         """
         ###################################################
-        # RECURSIVELY CALL FUNCTION                       #
-        ###################################################
-        if isinstance(d, collections.Iterable):
-            return [self.contains(dd) for dd in d]
-
-        ###################################################
         # INPUT CHECK                                     #
         ###################################################
-        if not isinstance(d, dt.date):
+        if not isinstance(time, dt.date):
             raise TypeError(
                     'Argument must be datetime.datetime or datetime.date.'
                     )
 
-        dd = year_one(d)
-        if dd < self.start:
-            dd = dd.replace(year=2)
+        # make time_yo be after self.start
+        time_yo = year_one(time)
+        if time_yo < self.start:
+            time_yo = time_yo.replace(year=2)
 
-        # check whether dd is earlier than self.end:
-        if dd < self.end:
+        # check whether time_yo is earlier than self.end:
+        if time_yo < self.end:
             return True
         else:
             return False
