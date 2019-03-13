@@ -157,7 +157,7 @@ def datetime_range(beg, end, inc, season_of_year=None, daytime_period=None):
     out = []
     d = beg
     while proceed(d):
-        if season.contains(d) and timeperiod.contains(d):
+        if (d in season) and (d in timeperiod):
             out.append(d)
         d += inc
     return out
