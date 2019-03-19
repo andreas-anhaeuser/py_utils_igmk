@@ -306,32 +306,38 @@ class Chronometer(object):
     ###################################################
     # COUNT                                           #
     ###################################################
-    def set_count(self, c):
-        self.count = c
-
     def get_count(self):
         return self.count
 
+    def set_count(self, c):
+        self.count = c
+        return self
+
     def decrease_count(self, increment=1):
         self.count -= increment
+        return self
 
     def increase_count(self, increment=1):
         self.count += increment
+        return self
 
     ###################################################
     # TOTAL COUNT                                     #
     ###################################################
-    def set_total_count(self, c):
-        self.total_count = c
-
     def get_total_count(self):
         return self.total_count
 
+    def set_total_count(self, c):
+        self.total_count = c
+        return self
+
     def decrease_total_count(self, increment=1):
         self.total_count -= increment
+        return self
 
     def increase_total_count(self, increment=1):
         self.total_count += increment
+        return self
 
     ###################################################
     # HELPER FUNCTIONS                                #
