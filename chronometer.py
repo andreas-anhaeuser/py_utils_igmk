@@ -19,6 +19,7 @@
 # standard modules
 import os
 import sys
+from collections import Iterable
 import datetime as dt
 import inspect
 import textwrap
@@ -132,12 +133,13 @@ class Chronometer(object):
     def __init__(
             self, total_count, time_step=None, header='', info='',
             show_message_times=True, file=None, print_colors=None,
+            item_name='loop', item_plural=None,
             ):
         """Initialize.
 
             Parameters
             ----------
-            total_count : int
+            total_count : int or Iterable
                 estimated number of iterations
             time_step: float, optional
                 (seconds) time interval in which messages should be printed on
@@ -147,16 +149,23 @@ class Chronometer(object):
                 header for the message that is printed on screen.
             show_message_times : bool, optional
                 Whether to prefix issue() messages by time stamp.
+            item_name : str, optional
+                (default: 'loop') What is counted.
+            item_plural : str, optional
+                (default: `unit` + '(e)s') Plural if not standard (item_name +
+                (e)s).
         """
-        now = dt.datetime.now()
-
         self.file = file
 
-        self.total_count = total_count
-        self.count = 0
+        if isinstance(total_count, Iterable):
+            self.total_count = len(total_count)
+        else:
+            self.total_count = int(total_count)
 
         self.header = str(header)
         self.info = str(info)
+
+        self.count = 0
 
         # time_step ----------------------------------
         if time_step is None:
@@ -181,6 +190,12 @@ class Chronometer(object):
             else:
                 print_colors = False
         self.print_colors = print_colors
+
+        self.item_name = item_name
+        if item_plural is not None:
+            self.item_plural = item_plural
+        else:
+            self.item_plural = plural(item_name)
 
         warnings.showwarning = self.custom_warning
 
@@ -360,14 +375,16 @@ class Chronometer(object):
         if x < 1:
             x *= 24
             units = 'd'
-        return '%s loops/%s' % (string_utils.human_format(x), units)
+        return '%s %s/%s' % (
+                string_utils.human_format(x), self.item_plural, units,
+                )
 
     def inverse_speed_string(self):
         speed = self.speed()
         if speed == 0:
             return '---'
         inverse_speed = 1 / speed
-        return short_time_string(inverse_speed, sep=' ') + '/loop'
+        return short_time_string(inverse_speed, sep=' ') + '/' + self.item_name
 
     def now_string(self):
         now = dt.datetime.now()
@@ -382,8 +399,11 @@ class Chronometer(object):
         time_todo = self.time_todo()
         if time_todo is None:
             return '---'
-        end = now + time_todo
-        return end.strftime(_tfmt)
+        try:
+            end = now + time_todo
+            return end.strftime(_tfmt)
+        except OverflowError:
+            return '---'
 
     def prefix_for_issue(self):
         """Return a colored time stamp as str."""
@@ -616,7 +636,10 @@ class Chronometer(object):
         if fraction_done == 0:
             return None
         seconds_total = seconds_done / fraction_done
-        return dt.timedelta(seconds=seconds_total)
+        try:
+            return dt.timedelta(seconds=seconds_total)
+        except OverflowError:
+            return None
 
     def speed(self):
         seconds_done = self.time_done().total_seconds()
@@ -817,26 +840,9 @@ def count_string(count):
         pos -= 3
     return nice
 
-
-###################################################
-# TESTING                                         #
-###################################################
-def test():
-    from time import sleep
-    filename = '.tmp.log'
-    filename = None
-    N = 2000
-    chrono = Chronometer(N, file=filename, print_colors=True)
-    print(chrono.print_colors)
-    for i in range(N):
-        if i % 100 == 0:
-            chrono.issue(i)
-        sleep(0.005)
-        # chrono.show(str(i))
-        chrono.loop_and_show()
-
-    chrono.resumee()
-
-
-if 1 and __name__ == '__main__':
-    test()
+def plural(word):
+    """Return `word` + '(e)s'."""
+    if word[:1] in ('s', 'x', 'z'):
+        return word + 'es'
+    else:
+        return word + 's'
