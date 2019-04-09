@@ -15,6 +15,7 @@
 import os
 import collections
 from copy import deepcopy as copy
+import warnings
 
 # PyPI modules
 import numpy as np
@@ -576,14 +577,10 @@ def column_list(
             d ='%1.0f.%1.0f' % (cw[j], prec[j]) + typ[j]
         # integer
         elif typ[j] == 'i':
-            raise NotImplementedError('')
-            # feel free to implement this
             d = '%1.0fd' % cw[j]
         # string
         elif typ[j] == 's':
-            raise NotImplementedError('')
-            # feel free to implement this
-            d = '%1.0fs' % cw[j]
+            d = '%1.0f' % cw[j]
         else:
             raise NotImplementedError('')
 
@@ -758,6 +755,7 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
     # RETRIEVE COLUMNS                                #
     ###################################################
     init = False
+    N_invalid_rows = 0
     for nline, line in enumerate(lines):
         # skip_rows
         if skip_rows > 0:
@@ -791,6 +789,7 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
 
         if len(words) != N:
             if skip_invalid_rows:
+                N_invalid_rows += 1
                 continue
             else:
                 raise Exception(
@@ -801,6 +800,13 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
         for n in range(N):
             word = words[n].strip()
             cols[n].append(word)
+
+    if N_invalid_rows > 0:
+        N_total_rows = N_invalid_rows + len(cols[0])
+        message = 'Skipped %i of %i rows in %s' % (
+                N_invalid_rows, N_total_rows, filename
+                )
+        warnings.warn(message)
 
     return cols
 
