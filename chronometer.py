@@ -202,17 +202,26 @@ class Chronometer(object):
     ###################################################
     # USER FUNCTIONS                                  #
     ###################################################
-    def loop(self):
+    def loop(self, loops=1):
         """Equivalent to self.increase_count(1)."""
-        self.count += 1
+        self.count += loops
 
     def show(self, usermessage=None, force=None, mode=None, wrap=70):
+        """Update screen."""
+        # set force to True of False
         if force is None:
             if usermessage is None:
                 force = False
             else:
                 force = True
 
+        # check if need to show
+        now = dt.datetime.now()
+        inactive_sec = self.last_active_timer.get('s')
+        if inactive_sec < self.time_step and not force:
+            return self
+
+        # python2-compatibility
         python_version = sys.version_info[0]    # (int)
         if python_version < 3:
             usermessage = unicode(usermessage)
@@ -223,15 +232,12 @@ class Chronometer(object):
                     )
             usermessage = ''.join([line + '\n' for line in lines])
 
-        now = dt.datetime.now()
-        inactive_sec = self.last_active_timer.get('s')
-        if inactive_sec < self.time_step and not force:
-            return
-        else:
-            self.last_active_timer.reset()
+        self.last_active_timer.reset()
 
         text = self.get_status_text(usermessage=usermessage, mode=mode)
         self.update_screen(text)
+
+        return self
 
     def loop_and_show(self, usermessage=None, force=None):
         self.loop()
@@ -486,7 +492,10 @@ class Chronometer(object):
 
         # header line
         indent = ' ' * _col_width[0]
-        if self.header != '':
+        header = self.header
+        if mode == 'resumee':
+            header = '[FINISHED] ' + header
+        if header != '':
             if self.print_colors:
                 line = indent + _BLUE + self.header + _ENDC + '\n'
             else:
