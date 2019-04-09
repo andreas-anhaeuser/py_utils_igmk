@@ -19,7 +19,7 @@ import datetime as dt
 import numpy as np
 
 # internal modules
-from .datetime_classes import DaytimePeriod, Season, Interval
+from .datetime_intervals import Interval, DaytimePeriod, Season
 
 ###################################################
 # range                                           #
@@ -615,11 +615,26 @@ def next_day(year, month, day):
     return y, m, d
 
 def add_months(time, number=1):
-    """Increase by number of months."""
+    """Increase by number of months.
+        
+        Parameters
+        ----------
+        time : datetime.date
+        number : int (pos or neg)
+            the number of months to add (substract if negative)
+
+        Returns
+        -------
+        datetime.datetime
+
+        Raises
+        ------
+        ValueError
+            If the day of the input does not exist in the output (29th...31st)    
+    """
     assert isinstance(time, dt.date)
     assert isinstance(number, int)
     number = int(number)
-    assert number >= 0
 
     year = time.year
     month = time.month
