@@ -59,7 +59,7 @@ def distance_on_sphere(
         
         History
         -------
-        2018-12-01 : (AA) Extention to arrays of arbitrary shape
+        2018-12-01: (AA) Extention to arrays of arbitrary shape
         2014-2016 : (AA)
     """
     ###################################
@@ -476,5 +476,3 @@ if __name__ == '__main__':
     D = f()
     print(np.shape(D))
     print(D)
-   
-
