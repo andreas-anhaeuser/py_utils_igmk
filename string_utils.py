@@ -244,10 +244,12 @@ def ordinal_str(number):
 ###################################################
 # PROGRESS BAR                                    #
 ###################################################
-def progress_bar(fraction, length=79, fillcolor='', bgcolor=''):
+def progress_bar(
+        fraction, length=79, fillcolor='', bgcolor='', delim_color=_BOLD,
+        ):
     """*Helper function. Return a nice progress bar as str. No '\n'."""
-    beg = _BOLD + u'\u2595' + _ENDC
-    end = _BOLD + u'\u258f' + _ENDC
+    beg = delim_color + u'\u2595' + _ENDC
+    end = delim_color + u'\u258f' + _ENDC
 
     Nbar = length - 2
 

@@ -262,8 +262,7 @@ class Chronometer(object):
         self.show(force=True)
 
     def resumee(self, usermessage=None):
-        self.show(force=True, usermessage=usermessage,
-                mode='resumee',)
+        self.show(force=True, usermessage=usermessage, mode='resumee')
         self.exit()
         return self
 
@@ -322,6 +321,11 @@ class Chronometer(object):
     def exit(self):
         """Clean up."""
         warnings.showwarning = _default_warning
+        return self
+
+    def set_header(self, header):
+        assert isinstance(header, str)
+        self.header = header
         return self
 
     ###################################################
@@ -541,7 +545,7 @@ class Chronometer(object):
         # third line
         words[0] = 'End:'
         words[1] = self.end_string()
-        words[2] = 'Inverse speed:'
+        words[2] = 'Expenditure:'
         words[3] = self.inverse_speed_string()
         if mode == 'run':
             colors = (_BOLD, _YELLOW, _BOLD, None)
@@ -561,7 +565,6 @@ class Chronometer(object):
         if self.print_colors:
             line = _BOLD + line + _ENDC
         text = text + line
-
 
         _colors = (_BOLD, None, None, None)
 
@@ -596,7 +599,18 @@ class Chronometer(object):
         # bar
         bar_width = sum(_col_width[1:])
         fraction_done = self.fraction_done()
-        bar = string_utils.progress_bar(fraction_done, bar_width)
+        delim_color = _BOLD
+        if mode == 'run':
+            fillcolor = ''
+        elif mode == 'resumee':
+            fillcolor = _GREEN
+
+        if not self.print_colors:
+            delim_color = ''
+            fillcolor = ''
+        
+        bar = string_utils.progress_bar(fraction_done, bar_width,
+                fillcolor=fillcolor, delim_color=delim_color)
         text = text + ' ' * _col_width[0] + bar + '\n'
 
         # usermessage
