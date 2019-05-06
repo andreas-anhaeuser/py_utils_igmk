@@ -44,6 +44,20 @@ class Interval(object):
         self.start_inclusive = start_inclusive
         self.end_inclusive = end_inclusive
 
+    def __eq__(self, other):
+        """Return a bool."""
+        if not isinstance(other, Interval):
+            return False
+        if other.start != self.start:
+            return False
+        if other.end != self.end:
+            return False
+        if other.start_inclusive != self.start_inclusive:
+            return False
+        if other.end_inclusive != self.end_inclusive:
+            return False
+        return True
+
     def __lt__(self, other):
         """Return True if strictly before, False otherwise.
 
@@ -403,6 +417,7 @@ class Interval(object):
         else:
             return self.end <= other.start
 
+
 class DaytimePeriod(object):
     """A portion of the day cycle.
 
@@ -553,6 +568,16 @@ class DaytimePeriod(object):
             return self._contains_interval(other)
         raise TypeError('Cannot compare to %s' % other.__class__)
 
+    def __eq__(self, other):
+        """return a bool."""
+        if not isinstance(other, DaytimePeriod):
+            return False
+        if other.start != self.start:
+            return False
+        if other.end != self.end:
+            return False
+        return True
+
     def contains(self, other):
         """Alias for backward compatibility."""
         return self.__contains__(other)
@@ -633,6 +658,7 @@ class DaytimePeriod(object):
             return True
         else:
             return False
+
 
 class Season(object):
     """A section of the year cycle.
@@ -839,6 +865,16 @@ class Season(object):
             text = '(full year)'
 
         return text
+
+    def __eq__(self, other):
+        """return a bool."""
+        if not isinstance(other, Season):
+            return False
+        if other.start != self.start:
+            return False
+        if other.end != self.end:
+            return False
+        return True
 
     def __contains__(self, other):
         """Return a bool or a list of such."""
