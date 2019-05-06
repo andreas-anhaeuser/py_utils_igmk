@@ -233,6 +233,39 @@ def year_range(beg, end, inc=1):
 
     return times
 
+def months_in_interval(interval):
+    """Return all overlapping months as list of Interval.
+
+        Parameters
+        ----------
+        interval : Interval
+
+        Returns
+        -------
+        months : list of Interval
+    """
+    time_beg = interval.start.replace(
+            day=1, hour=0, minute=0, second=0, microsecond = 0,
+            )
+    time_end = interval.end
+
+    months = []
+    for time_lo in month_range(time_beg, time_end):
+        time_hi = add_months(time_lo)
+        month = Interval(time_lo, time_hi)
+        months.append(month)
+
+    # special case: time_end is exactly at the beginning of the month and
+    # inclusive
+    if interval.end_inclusive and (time_end not in months[-1]):
+        time_lo = time_end
+        time_hi = add_months(time_lo)
+        month = Interval(time_lo, time_hi)
+        months.append(month)
+
+    return months
+        
+
 
 ###################################################
 # unixtime (seconds since ...)                    #
