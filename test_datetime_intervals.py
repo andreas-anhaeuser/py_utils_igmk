@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Testing suite for datetime_classes."""
+"""Testing suite for datetime_intervals."""
 
 import datetime as dt
 import unittest
