@@ -277,6 +277,7 @@ def get_namelist(
             string that marks the end of the parameter name. Default: ':'
         sep : str, optional
             string that separates elements of a value list. Default: ','
+            set to '' to disable.
         comment : str, optional
             string that indicates the start of a comment. Default: '#'
         ignore_char : str, optional
