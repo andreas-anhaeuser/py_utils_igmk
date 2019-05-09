@@ -675,7 +675,7 @@ def add_months(time, number=1):
         for n in range(number):
             year, month = next_month(year, month)
     else:
-        for n in range(number):
+        for n in range(abs(number)):
             year, month = previous_month(year, month)
     return time.replace(year=year, month=month)
 
