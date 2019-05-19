@@ -644,7 +644,7 @@ def get_column_list(*args, **kwargs):
     return read_column_list(*args, **kwargs)
 
 def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
-        skip_invalid_rows=False):
+        skip_invalid_rows=False, set_to_lowercase=False):
     """Read text file structured in columns and return as list of lists.
     
         Parameters
@@ -657,6 +657,8 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
             number of rows at the beginning to skip, Detault: 0
         comment_str : str, optional
             str indicating comments. Default: '#'
+        set_to_lowercase : bool, optional
+            if True, all strings are set to lower case
 
         Returns
         -------
@@ -697,6 +699,10 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
 
         # remove leading and trailing white spaces and newline:
         line = line.strip('\n').strip()
+
+        # set to lowercase
+        if set_to_lowercase:
+            line = line.lower()
         
         # skip empty line:
         if line == '':
@@ -745,7 +751,8 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
 
 def read_column_list_with_headers(
         filename, sep=None, comment_str='#', convert_to_number=False,
-        nan_str='nan', skip_invalid_rows=False):
+        nan_str='nan', skip_invalid_rows=False, **kwargs
+        ):
     """Read text file structured in columns and return as dict.
 
         Parameters
@@ -781,8 +788,10 @@ def read_column_list_with_headers(
     """
     dtype = float
 
-    cols = read_column_list(filename, sep=sep, comment_str=comment_str,
-            skip_invalid_rows=skip_invalid_rows)
+    cols = read_column_list(
+            filename, sep=sep, comment_str=comment_str,
+            skip_invalid_rows=skip_invalid_rows, **kwargs
+            )
 
     data = {}
     for col in cols:
