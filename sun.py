@@ -12,6 +12,7 @@
 import datetime as dt
 
 # PyPI modules
+import numpy as np
 import ephem
 
 def utc_sunrise_sunset(d, lon, lat, alt=0, pres=None, temp=None):
@@ -221,7 +222,8 @@ def is_night(d, lon, lat):
 def last_sunrise(*args, **kwargs):
     """Return a dt.datetime.
 
-        Regardless of the altitude, the horizon is assumed to be at 0 deg.
+        Regardless of the altitude, the horizon is assumed to be at 0 deg (for
+        an observer at zero altitude).
 
         Parameters
         ----------
@@ -487,15 +489,18 @@ def sun_position(d, lon, lat):
 
         Authors
         -------
+        CF : Christopher Frank <cfrank@meteo.uni-koeln.de>
+        AA : Andreas Anhaeuser <andreas.anhaeuser@posteo.net>
         Institute for Geophysics and Meteorology
         University of Cologne, Germany
         http://www.geomet.uni-koeln.de/en/home/
 
-        2016: Written by
-        Christopher Frank <cfrank@meteo.uni-koeln.de>
 
-        2016-09-09: Slightly modified by
-        Andreas Anhaeuser <andreas.anhaeuser@posteo.net>
+        History
+        -------
+        2019-05-19 (AA): Debug (wrong variable names, missing numpy-import)
+        2016-09-09 (AA): Slightly modified
+        2016       (CF): Written
     """
     ###################################################
     # CREATE SUN OBJECT                               #
@@ -511,11 +516,11 @@ def sun_position(d, lon, lat):
     site.date = d
 
     sun.compute(site)
-    altitude_rad = sun.alt  # radiant
-    azimuth_rad = sun.az    # radiant
-    altitude_deg = 180. / np.pi * altitude_rad
-    azimuth_deg = 180. / np.pi * azimuth_rad
-    return altitude_grad, azimuth_grad
+    altitude_rad = sun.alt  # radians
+    azimuth_rad = sun.az    # radians
+    altitude_deg = np.degrees(altitude_rad)
+    azimuth_deg = np.degrees(azimuth_rad)
+    return altitude_deg, azimuth_deg
 
 
 ###################################################
