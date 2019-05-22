@@ -15,6 +15,7 @@
     2017-01-25 (AA): Changed layout
     2018-01-25 (AA): Updated docstring.
 """
+from __future__ import print_function
 
 # standard modules
 import os
@@ -269,7 +270,7 @@ class Chronometer(object):
         self.loop()
         self.show(usermessage=usermessage, force=force)
 
-    def issue(self, text, *args, wrap=False, **kwargs):
+    def issue(self, text, wrap=False, *args, **kwargs):
         """Print time stamp and message."""
         text = ' '.join([str(arg) for arg in (text,) + args])
         if wrap:
