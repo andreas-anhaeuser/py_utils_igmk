@@ -141,7 +141,7 @@ class Chronometer(object):
     # INIT                                            #
     ###################################################
     def __init__(
-            self, total_count, time_step=None, header='', info='',
+            self, total_count=1, time_step=None, header='', info='',
             show_message_times=True, file=None, print_colors=None,
             item_name='loop', item_plural=None,
             ):
@@ -229,6 +229,12 @@ class Chronometer(object):
     ###################################################
     # USER FUNCTIONS                                  #
     ###################################################
+    @classmethod
+    def exit(self):
+        """Clean up."""
+        self.__exit__(self, None, None, None)
+        return self
+
     def loop(self, loops=1):
         """Equivalent to self.increase_count(1)."""
         self.count += loops
@@ -270,23 +276,50 @@ class Chronometer(object):
         self.loop()
         self.show(usermessage=usermessage, force=force)
 
-    def issue(self, text, wrap=False, *args, **kwargs):
+    def issue(self, text, *args, **kwargs):
         """Print time stamp and message."""
-        text = ' '.join([str(arg) for arg in (text,) + args])
+        warnings.showwarning = _builtin_warning
+
+        if 'sep' in kwargs:
+            sep = kwargs['sep']
+        else:
+            sep = ' '
+
+        if 'wrap' in kwargs:
+            wrap = kwargs['wrap']
+        else:
+            wrap = True
+
+        # join arguments to one string
+        text = sep.join([str(arg) for arg in (text,) + args])
+
+        # wrap text ----------------------------------
         if wrap:
             if isinstance(wrap, bool):
-                screen_size = os.popen('stty size', 'r').read().split()
-                wrap = int(screen_size[1]) - 16
+                with os.popen('stty size', 'r') as fid:
+                    screen_size = fid.read().split()
+                wrap = int(screen_size[1]) - (self.prefix_length() + 1)
 
             lines = textwrap.wrap(
-                    text, wrap, break_on_hyphens=False
-                    )
-            text = ''.join([line + '\n' for line in lines])
+                text, wrap, break_on_hyphens=False
+                )
+        else:
+            lines = [text]
+        # --------------------------------------------
 
-        prefix = self.prefix_for_issue()
-        self.update_screen(prefix + text)
-        self.Nlines_last_message = 0
-        self.show(force=True)
+        # print --------------------------------------
+        for nline, line in enumerate(lines):
+            if nline == 0:
+                prefix = self.prefix_for_issue()
+            else:
+                prefix = ' ' * self.prefix_length()
+            self.update_screen(prefix + line)
+            self.Nlines_last_message = 0
+            self.show(force=True)
+        # --------------------------------------------
+            
+        warnings.showwarning = self.custom_warning
+        return self
 
     def resumee(self, usermessage=None):
         self.show(force=True, usermessage=usermessage, mode='resumee')
@@ -344,11 +377,6 @@ class Chronometer(object):
 
     def get_info(self):
         return self.info
-
-    def exit(self):
-        """Clean up."""
-        self.__exit__(None, None, None)
-        return self
 
     def set_header(self, header):
         assert isinstance(header, str)
@@ -415,6 +443,10 @@ class Chronometer(object):
             return _BLUE + prefix + _ENDC
         else:
             return prefix
+
+    def prefix_length(self):
+        pattern = '+0.0s [00:00:00] '
+        return len(pattern)
 
     def build_line(self, words, colors=[_BOLD, None, None, None]):
         line = ''
