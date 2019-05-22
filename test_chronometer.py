@@ -9,6 +9,43 @@ from lib.pub.utils_igmk.chronometer import Chronometer
 ###################################################
 # TESTING                                         #
 ###################################################
+class ContextManager(unittest.TestCase):
+    def test_in_context(self):
+        N = 3
+        print('-----')
+        print('Test context management')
+        with Chronometer(N) as chrono:
+            for n in range(N):
+                print('Inside context, loop %i/%i' % (n+1, N))
+                chrono.loop_and_show()
+        print('Outside context.')
+        chrono.resumee()
+        print('Outside context.')
+
+    def test_exit_function(self):
+        N = 3
+        print('-----')
+        print('Test exit function')
+        chrono = Chronometer(N)
+        for n in range(N):
+            print('Inside context, loop %i/%i' % (n+1, N))
+            chrono.loop()
+        print('Inside context.')
+        chrono.exit()
+        print('Outside context.')
+
+    def test_exit_via_resumee(self):
+        N = 3
+        print('-----')
+        print('Test exit function')
+        chrono = Chronometer(N)
+        for n in range(N):
+            print('Inside context, loop %i/%i' % (n+1, N))
+            chrono.loop()
+        print('Inside context.')
+        chrono.resumee()
+        print('Outside context.')
+
 class BasicFunctionality(unittest.TestCase):
     def setUp(self):
         pass
@@ -68,6 +105,7 @@ class Colors(unittest.TestCase):
             chrono.loop_and_show()
             self.sleep()
         chrono.resumee()
+
 
 if __name__ == '__main__':
     unittest.main()

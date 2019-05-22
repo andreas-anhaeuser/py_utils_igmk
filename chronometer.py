@@ -20,10 +20,15 @@
 import os
 import sys
 from collections import Iterable
+from copy import deepcopy as copy
 import datetime as dt
 import inspect
 import textwrap
 import warnings
+if sys.version_info.major < 3:
+    import __builtin__ as builtin
+else:
+    import builtins as builtin
 
 # PyPI modules
 import numpy as np
@@ -32,9 +37,14 @@ import numpy as np
 if __name__ == '__main__':
     import string_utils
     from timer import Timer
+    import chronometer_utils as utils
 else:
     from . import string_utils
     from .timer import Timer
+    from . import chronometer_utils as utils
+
+_builtin_print = copy(builtin.print)
+_builtin_warning = warnings.showwarning
 
 ###################################################
 # CONSTANTS                                       #
@@ -67,7 +77,6 @@ _CLEARLINE  = '\033[K'  # erase to end of line
 _SAVECRS = '\033[s'     # save curser position
 _RESTORECRS = '\033[u'  # restore curser position
 
-_default_warning = warnings.showwarning
 
 ###################################################
 # CLASS                                           #
@@ -195,9 +204,26 @@ class Chronometer(object):
         if item_plural is not None:
             self.item_plural = item_plural
         else:
-            self.item_plural = plural(item_name)
+            self.item_plural = utils.plural(item_name)
 
+        # customize printing
+        # =================================================
+        # override builtin `print`
+        builtin.print = self.issue
+
+        # override default warning handling
         warnings.showwarning = self.custom_warning
+
+    ############################################################
+    # CONTEXT MANAGEMENT                                       #
+    ############################################################
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Re-assign builtin functions for `print` and warnings."""
+        builtin.print = _builtin_print
+        warnings.showwarning = _builtin_warning
 
     ###################################################
     # USER FUNCTIONS                                  #
@@ -243,9 +269,9 @@ class Chronometer(object):
         self.loop()
         self.show(usermessage=usermessage, force=force)
 
-    def issue(self, text, wrap=False):
+    def issue(self, text, *args, wrap=False, **kwargs):
         """Print time stamp and message."""
-        text = str(text)
+        text = ' '.join([str(arg) for arg in (text,) + args])
         if wrap:
             if isinstance(wrap, bool):
                 screen_size = os.popen('stty size', 'r').read().split()
@@ -320,7 +346,7 @@ class Chronometer(object):
 
     def exit(self):
         """Clean up."""
-        warnings.showwarning = _default_warning
+        self.__exit__(None, None, None)
         return self
 
     def set_header(self, header):
@@ -367,54 +393,6 @@ class Chronometer(object):
     ###################################################
     # HELPER FUNCTIONS                                #
     ###################################################
-    def speed_string(self):
-        speed = self.speed()
-        if speed == 0:
-            return '---'
-        x = speed
-        units = 's'
-        # minutes
-        if x < 1:
-            x *= 60
-            units = 'min'
-        # hours
-        if x < 1:
-            x *= 60
-            units = 'h'
-        # days
-        if x < 1:
-            x *= 24
-            units = 'd'
-        return '%s %s/%s' % (
-                string_utils.human_format(x), self.item_plural, units,
-                )
-
-    def inverse_speed_string(self):
-        speed = self.speed()
-        if speed == 0:
-            return '---'
-        inverse_speed = 1 / speed
-        return short_time_string(inverse_speed, sep=' ') + '/' + self.item_name
-
-    def now_string(self):
-        now = dt.datetime.now()
-        return now.strftime(_tfmt)
-
-    def start_string(self):
-        start = self.global_timer.get_start()
-        return start.strftime(_tfmt)
-
-    def end_string(self):
-        now = dt.datetime.now()
-        time_todo = self.time_todo()
-        if time_todo is None:
-            return '---'
-        try:
-            end = now + time_todo
-            return end.strftime(_tfmt)
-        except OverflowError:
-            return '---'
-
     def prefix_for_issue(self):
         """Return a colored time stamp as str."""
         if not self.show_message_times:
@@ -425,8 +403,7 @@ class Chronometer(object):
 
         # difference to last message
         diff = self.last_message_timer.get('s')
-        # diff_str_inner = short_time_string_no_frac(diff, 3)
-        diff_str_inner = nice_time_string(diff)
+        diff_str_inner = utils.nice_time_string(diff)
         diff_str_full = '+%s' % diff_str_inner.rjust(4)
         self.last_message_timer.reset()
 
@@ -524,7 +501,8 @@ class Chronometer(object):
 
         # first line
         words[0] = 'Start:'
-        words[1] = self.start_string()
+        words[1] = self.global_timer.get_start().strftime(_tfmt)
+
         words[2] = ''
         words[3] = ''
         line = self.build_line(words, colors=_colors)
@@ -536,17 +514,17 @@ class Chronometer(object):
         elif mode == 'resumee':
             colors = (_BOLD, None, _BOLD, None)
         words[0] = 'Now:'
-        words[1] = self.now_string()
+        words[1] = dt.datetime.now().strftime(_tfmt)
         words[2] = 'Speed:'
-        words[3] = self.speed_string()
+        words[3] = utils.speed_string(self)
         line = self.build_line(words, colors=colors)
         text = text + line
 
         # third line
         words[0] = 'End:'
-        words[1] = self.end_string()
+        words[1] = utils.end_string(self, _tfmt)
         words[2] = 'Expenditure:'
-        words[3] = self.inverse_speed_string()
+        words[3] = utils.inverse_speed_string(self)
         if mode == 'run':
             colors = (_BOLD, _YELLOW, _BOLD, None)
         elif mode == 'resumee':
@@ -570,9 +548,9 @@ class Chronometer(object):
 
         # time
         words[0] = 'Time:'
-        words[1] = time_string(self.time_total())
-        words[2] = time_string(self.time_done())
-        words[3] = time_string(self.time_todo())
+        words[1] = utils.time_string(utils.time_total(self))
+        words[2] = utils.time_string(utils.time_done(self))
+        words[3] = utils.time_string(utils.time_todo(self))
         if mode == 'run':
             colors = (_BOLD, None, None, _YELLOW)
         elif mode == 'resumee':
@@ -582,23 +560,23 @@ class Chronometer(object):
 
         # count line
         words[0] = 'Loops:'
-        words[1] = count_string(self.total_count)
-        words[2] = count_string(np.floor(self.count))
-        words[3] = count_string(np.ceil(self.total_count - self.count))
+        words[1] = utils.count_string(self.total_count)
+        words[2] = utils.count_string(np.floor(self.count))
+        words[3] = utils.count_string(np.ceil(self.total_count - self.count))
         line = self.build_line(words, colors=_colors)
         text = text + line
 
         # fraction line
         words[0] = 'Fraction:'
         words[1] = '100 %'
-        words[2] = string_utils.percentage_string(self.fraction_done())
-        words[3] = string_utils.percentage_string(self.fraction_todo())
+        words[2] = string_utils.percentage_string(utils.fraction_done(self))
+        words[3] = string_utils.percentage_string(utils.fraction_todo(self))
         line = self.build_line(words, colors=_colors)
         text = text + line
 
         # bar
         bar_width = sum(_col_width[1:])
-        fraction_done = self.fraction_done()
+        fraction_done = utils.fraction_done(self)
         delim_color = _BOLD
         if mode == 'run':
             fillcolor = ''
@@ -628,46 +606,6 @@ class Chronometer(object):
         self.Nlines_last_message = text.count('\n') + 1
         self._print(text)
 
-    def fraction_done(self):
-        total_count = self.total_count
-        if total_count > 0:
-            return 1. * self.count / self.total_count
-        else:
-            return 1.
-
-    def fraction_todo(self):
-        return 1. - self.fraction_done()
-
-    def time_done(self):
-        """Return a dt.timedelta."""
-        return self.global_timer.get('t')
-
-    def time_todo(self):
-        """Return a dt.timedelta."""
-        if self.count == self.total_count:
-            return dt.timedelta()
-
-        time_total = self.time_total()
-        if time_total is None:
-            return None
-        return time_total - self.time_done()
-
-    def time_total(self):
-        """Return a dt.timedelta."""
-        seconds_done = self.time_done().total_seconds()
-        fraction_done = self.fraction_done()
-        if fraction_done == 0:
-            return None
-        seconds_total = seconds_done / fraction_done
-        try:
-            return dt.timedelta(seconds=seconds_total)
-        except OverflowError:
-            return None
-
-    def speed(self):
-        seconds_done = self.time_done().total_seconds()
-        return self.count / seconds_done
-
     def delete_lines(self, N=0):
         N = int(N)
         if N == 0:
@@ -689,7 +627,7 @@ class Chronometer(object):
 
     def _print(self, text):
         if self.file is None:
-            print(text)
+            _builtin_print(text)
         else:
             with open(self.file, 'a') as fid:
                 # fid.write((text + '\n').encode('utf-8'))
@@ -699,173 +637,3 @@ class Chronometer(object):
 class PerformanceInfo(Chronometer):
     """Alias to Chronometer."""
     pass
-
-###################################################
-# HELPER FUNCTIONS                                #
-###################################################
-def sound(length, freq=1000):
-    """Play a sine sound.
-
-        Parameters
-        ----------
-        length : float
-            duration in seconds
-        freq : float
-            frequency in Hertz
-
-        Returns
-        -------
-        None
-
-        Author
-        ------
-        Andreas Anhaeuser (AA) <anhaeus@meteo.uni-koeln.de>
-        Institute for Geophysics and Meteorology
-        University of Cologne, Germany
-
-        History
-        -------
-                2016-09-22 (AA): Created
-    """
-    os.system('play --no-show-progress --null --channels 1 synth %s sine %f' %\
-            (length, freq))
-
-def time_string(x):
-    """Convert timedelta to str.
-
-        Parameters
-        ----------
-        x : dt.timedelta or None
-
-        Returns
-        -------
-        str
-
-        Author
-        ------
-        Andreas Anhaeuser (AA) <anhaeus@meteo.uni-koeln.de>
-        Institute for Geophysics and Meteorology
-        University of Cologne, Germany
-
-        History
-        -------
-        2017-04-06 (AA): Created
-    """
-    ###################################################
-    # SPECIAL CASES                                   #
-    ###################################################
-    # None
-    if x is None:
-        return 'unknown'
-
-    # negative
-    if x < dt.timedelta():
-        return '-' + time_string(-x)
-
-    ###################################################
-    # REGULAR CASE                                    #
-    ###################################################
-    secs = int(x.total_seconds())
-    return str(dt.timedelta(seconds=secs))
-
-def short_time_string(seconds, sep=''):
-    """Convert to minutes, hours, days if neccessary.
-
-        Parameters
-        ----------
-        seconds : float
-        sep : str, optional
-            separator between number and unit. Default: ''
-
-        Returns
-        -------
-        str
-            something like '3.0s', '51min', etc
-
-        Author
-        ------
-        Andreas Anhaeuser (AA) <anhaeus@meteo.uni-koeln.de>
-        Institute for Geophysics and Meteorology
-        University of Cologne, Germany
-
-        History
-        -------
-        2017-03-08 (AA): Created
-    """
-    x = seconds
-    units = 's'
-    # minutes
-    if abs(x) > 60:
-        x /= 60
-        units = 'min'
-    # hours
-    if abs(x) > 60:
-        x /= 60
-        units = 'h'
-        # days
-        if abs(x) > 24:
-            x /= 24
-            units = 'd'
-    return '%s%s' % (string_utils.human_format(x, sep=sep), units)
-
-def nice_time_string(seconds):
-    """Return N.Mu or NNu or NNNu."""
-    value = seconds
-    units = 's'
-    if value > 300:
-        value /= 60
-        units = 'm'
-        if value > 300:
-            value /= 60
-            units = 'h'
-            if value > 100:
-                value /= 24
-                units = 'd'
-
-    if value >= 10:
-        fmt = '%1.0f'
-    else:
-        fmt = '%1.1f'
-
-    return fmt % value + units
-
-def short_time_string_no_frac(seconds, digits=3, sep=''):
-    x = int(np.round(seconds))
-    units = 's'
-    # minutes
-    if len(str(x)) > digits:
-        x //= 60
-        units = 'm'
-    # hours
-    if len(str(x)) > digits:
-        x //= 60
-        units = 'h'
-    # days
-    if len(str(x)) > digits:
-        x //= 24
-        units = 'd'
-    # years
-    if len(str(x)) > digits:
-        x //= 365
-        units = 'a'
-    return '%s%s%s' % (str(x), sep, units)
-
-def count_string(count):
-    if count < 0:
-        return '-' + count_string(-count)
-
-    plain = '%1.0f' % count
-    len_plain = len(plain)
-    nice = plain[-3:]
-    pos = -3
-    while pos > - len_plain:
-        nice = plain[pos-3:pos] + ',' + nice
-        pos -= 3
-    return nice
-
-def plural(word):
-    """Return `word` + '(e)s'."""
-    if word[:1] in ('s', 'x', 'z'):
-        return word + 'es'
-    else:
-        return word + 's'
