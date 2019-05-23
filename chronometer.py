@@ -288,7 +288,13 @@ class Chronometer(object):
         if 'wrap' in kwargs:
             wrap = kwargs['wrap']
         else:
-            wrap = True
+            wrap = None
+
+        if wrap is None:
+            if self.file is None:
+                wrap = True
+            else:
+                wrap = False
 
         # join arguments to one string
         text = sep.join([str(arg) for arg in (text,) + args])
@@ -305,6 +311,9 @@ class Chronometer(object):
                 )
         else:
             lines = [text]
+
+        if len(lines) == 0:
+            lines = ['']
         # --------------------------------------------
 
         # print --------------------------------------
