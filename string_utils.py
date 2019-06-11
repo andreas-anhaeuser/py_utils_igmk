@@ -99,6 +99,9 @@ def human_format(num, digits=2, sep='', mode='prefix', type='float'):
     if np.isnan(num):
         return 'NaN'
 
+    if num == 0:
+        return '0'
+
     if np.isposinf(num):
         if mode == 'tex':
             return '$\\infty$'
@@ -246,7 +249,8 @@ def ordinal_str(number):
 # COLOR FORMATTING                                #
 ###################################################
 def highlighted_string_list(
-        words, n=None, sep=', ', start_hl=_BOLD, end_hl=_ENDC
+        words, n=None, sep=', ', start_hl=_BOLD, end_hl=_ENDC,
+        index_error=False,
         ):
     """Return a string with one element highlighted.
 
@@ -261,6 +265,8 @@ def highlighted_string_list(
             highlight string
         end_hl : str, optional
             un-highlight string
+        index_error : bool, optional
+            (default: False) raise error if n out of bounds
 
         Returns
         -------
@@ -270,13 +276,12 @@ def highlighted_string_list(
     if n is not None:
         if not isinstance(n, int):
             raise TypeError('n must be int.')
-        if not 0 <= n < len(words):
-            raise ValueError(
-                    'Expected 0 <= n < %i, found n == %i'
-                    % (len(words), n)
-                    )
-        words = copy(words)
-        words[n] = start_hl + words[n] + end_hl
+        try:
+            words = copy(words)
+            words[n] = start_hl + words[n] + end_hl
+        except IndexError as e:
+            if index_error:
+                raise e
 
     # join list to str
     line = sep.join(words)
