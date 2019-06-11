@@ -74,9 +74,8 @@ def read_vartable(filename, sep='|', comment='#', ignore_str=' '):
     ###################################################
     # READ FILE                                       #
     ###################################################
-    fid = open(filename, 'r')
-    lines = fid.readlines()
-    fid.close()
+    with open(filename, 'r') as fid:
+        lines = fid.readlines()
 
     ###################################################
     # INITIALIZE                                      #
@@ -373,7 +372,7 @@ def get_namelist(
         cond2 = sep in data
         cond3 = not has_delimiters(data, str_delims)
         if cond1 and cond2 and cond3:
-            data = data.split(sep)
+            data = data.strip(sep).split(sep)
             for n in range(len(data)):
                 data[n] = data[n].strip(ignore_char)
 
@@ -440,7 +439,7 @@ def str2num(s, str_delims=_str_delims):
 
 def column_list(
         headers, data, typ='s', align='l', column_width=16, precision=7,
-        filename=None, comment_top=None, comment_bottom=None,
+        filename=None, comment_top=None, comment_bottom=None, sep=' ',
         ):
     """Write an ascii file with aligned columns.
 
@@ -461,6 +460,8 @@ def column_list(
             number of digits after period. Default: all 7
         filename : str, optional
             path to file where the table is to be saved. Default: None
+        sep : str, optional
+            (default: ' ') column separator
 
         Returns
         -------
@@ -543,6 +544,9 @@ def column_list(
         else:
             word = headers[j]
 
+        if j < J - 1:
+            word = word + sep
+
         # justify
         if align[j] == 'l':
             word = word.ljust(cw[j])
@@ -550,9 +554,6 @@ def column_list(
             word = word.center(cw[j])
         elif align[j] == 'r':
             word = word.rjust(cw[j])
-
-        if j > 0:
-            word = ' ' + word
 
         # append
         line = line + word
@@ -587,6 +588,8 @@ def column_list(
 
         # formatter
         fmt = '{:' + a + d + '}'    # e.g. ' {:<14}'
+        if j < J - 1:
+            fmt = fmt + sep
         fmts.append(fmt)
 
     ###################################################
@@ -596,8 +599,8 @@ def column_list(
         line = '\n'
         for j in range(J):
             word = fmts[j].format(data[j][n])
-            if j > 0:
-                word = ' ' + word
+            # if j < J - 1:
+                # word = word + sep
             line = line + word
         text = text + line.rstrip()
 
@@ -682,9 +685,8 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
     ###################################################
     # READ FILE                                       #
     ###################################################
-    fid = open(filename)
-    lines = fid.readlines()
-    fid.close()
+    with open(filename, 'r') as fid:
+        lines = fid.readlines()
 
     ###################################################
     # RETRIEVE COLUMNS                                #
@@ -732,8 +734,8 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
                 continue
             else:
                 raise Exception(
-                        'Row contains %i columns, but should be %i.' 
-                        % (len(words), N)
+                        'Row %i contains %i columns (expected %i): %s'
+                        % (nline + 1, len(words), N, filename)
                         )
 
         for n in range(N):
