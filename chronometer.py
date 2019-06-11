@@ -143,7 +143,7 @@ class Chronometer(object):
     def __init__(
             self, total_count=1, time_step=None, header='', info='',
             show_message_times=True, file=None, print_colors=None,
-            item_name='loop', item_plural=None,
+            item_name='loop', item_plural=None, report_level='normal',
             ):
         """Initialize.
 
@@ -164,6 +164,17 @@ class Chronometer(object):
             item_plural : str, optional
                 (default: `unit` + '(e)s') Plural if not standard (item_name +
                 (e)s).
+
+
+            TODO
+            ====
+            Report levels
+            -------------
+            1 : critical
+            2 : error
+            3 : warning
+            4 : normal
+            5 : debug
         """
         self.file = file
 
@@ -278,6 +289,9 @@ class Chronometer(object):
 
     def issue(self, text, *args, **kwargs):
         """Print time stamp and message."""
+        if 'file' in kwargs:
+            _builtin_print(text, *args, **kwargs)
+
         warnings.showwarning = _builtin_warning
 
         if 'sep' in kwargs:
@@ -392,6 +406,14 @@ class Chronometer(object):
         self.header = header
         return self
 
+    def set_item_name(self, item_name, plural_name=None):
+        if plural_name is None:
+            plural_name = utils.plural(item_name)
+
+        self.item_name = item_name
+        self.item_plural = plural_name
+        return self
+
     ###################################################
     # COUNT                                           #
     ###################################################
@@ -417,7 +439,10 @@ class Chronometer(object):
         return self.total_count
 
     def set_total_count(self, c):
-        self.total_count = c
+        if isinstance(c, Iterable):
+            self.total_count = len(c)
+        else:
+            self.total_count = int(c)
         return self
 
     def decrease_total_count(self, increment=1):
