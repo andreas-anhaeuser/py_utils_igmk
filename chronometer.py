@@ -176,47 +176,20 @@ class Chronometer(object):
             4 : normal
             5 : debug
         """
-        self.file = file
-
-        if isinstance(total_count, Iterable):
-            self.total_count = len(total_count)
-        else:
-            self.total_count = int(total_count)
-
-        self.header = str(header)
+        self.set_output(file, print_colors, time_step)
+        self.set_total_count(total_count)
+        self.set_count(0)
+        self.set_header(header)
         self.info = str(info)
-
-        self.count = 0
-
-        # time_step ----------------------------------
-        if time_step is None:
-            if self.file is None:
-                time_step = 0.03
-            else:
-                time_step = 1.
-        self.time_step = time_step
-        # --------------------------------------------
-
-        self.Nlines_last_message = 0
-        self.show_message_times = show_message_times
+        self.set_item_name(item_name, item_plural)
 
         # timers
         self.global_timer = Timer().start()
         self.last_active_timer = Timer().start()
         self.last_message_timer = Timer().start()
 
-        if print_colors is None:
-            if self.file is None:
-                print_colors = True
-            else:
-                print_colors = False
-        self.print_colors = print_colors
-
-        self.item_name = item_name
-        if item_plural is not None:
-            self.item_plural = item_plural
-        else:
-            self.item_plural = utils.plural(item_name)
+        self.Nlines_last_message = 0
+        self.show_message_times = show_message_times
 
         # customize printing
         # =================================================
@@ -392,21 +365,62 @@ class Chronometer(object):
             text = 'DEBUG-mode in ' + module_name
         self.warning(text)
 
+    ###################################################
+    # GETTERS                                         #
+    ###################################################
+    def get_count(self):
+        return self.count
+
+    def get_info(self):
+        return self.info
+
+    def get_total_count(self):
+        return self.total_count
+
+    ###################################################
+    # SETTERS                                         #
+    ###################################################
+    def set_count(self, c):
+        self.count = c
+        return self
+
+    def set_file(self, *args, **kwargs):
+        """Alias to set_output."""
+        return self.set_output(*args, **kwargs)
+
+    def set_output(self, filename=None, print_colors=None, time_step=None):
+        """Set output file, colors, time step."""
+        if print_colors is None:
+            if filename is None:
+                print_colors = True
+            else:
+                print_colors = False
+
+        if time_step is None:
+            if filename is None:
+                time_step = 0.03
+            else:
+                time_step = 1.
+
+        self.print_colors = print_colors
+        self.time_step = time_step
+        self.file = filename
+        return self
+
     def set_info(self, info=''):
         """Change info string."""
         if not isinstance(info, str):
             raise TypeError('info must be str.')
         self.info = str(info)
 
-    def get_info(self):
-        return self.info
-
     def set_header(self, header):
-        assert isinstance(header, str)
-        self.header = header
+        self.header = str(header)
         return self
 
-    def set_item_name(self, item_name, plural_name=None):
+    def set_item_name(self, item_name=None, plural_name=None):
+        if item_name is None:
+            item_name = 'loop'
+
         if plural_name is None:
             plural_name = utils.plural(item_name)
 
@@ -414,16 +428,16 @@ class Chronometer(object):
         self.item_plural = plural_name
         return self
 
+    def set_total_count(self, c):
+        if isinstance(c, Iterable):
+            self.total_count = len(c)
+        else:
+            self.total_count = int(c)
+        return self
+
     ###################################################
     # COUNT                                           #
     ###################################################
-    def get_count(self):
-        return self.count
-
-    def set_count(self, c):
-        self.count = c
-        return self
-
     def decrease_count(self, increment=1):
         self.count -= increment
         return self
@@ -435,16 +449,6 @@ class Chronometer(object):
     ###################################################
     # TOTAL COUNT                                     #
     ###################################################
-    def get_total_count(self):
-        return self.total_count
-
-    def set_total_count(self, c):
-        if isinstance(c, Iterable):
-            self.total_count = len(c)
-        else:
-            self.total_count = int(c)
-        return self
-
     def decrease_total_count(self, increment=1):
         self.total_count -= increment
         return self
