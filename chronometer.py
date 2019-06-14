@@ -206,17 +206,18 @@ class Chronometer(object):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        """Re-assign builtin functions for `print` and warnings."""
-        builtin.print = _builtin_print
-        warnings.showwarning = _builtin_warning
+        """Clean up."""
+        self.exit()
+        self.resumee()
 
     ###################################################
     # USER FUNCTIONS                                  #
     ###################################################
     @classmethod
-    def exit(self):
-        """Clean up."""
-        self.__exit__(self, None, None, None)
+    def exit(self, usermessage=None):
+        """Re-assign builtin functions for `print` and warnings."""
+        builtin.print = _builtin_print
+        warnings.showwarning = _builtin_warning
         return self
 
     def loop(self, loops=1):
@@ -318,6 +319,7 @@ class Chronometer(object):
         return self
 
     def resumee(self, usermessage=None):
+        """Show an overview and clean up."""
         self.show(force=True, usermessage=usermessage, mode='resumee')
         self.exit()
         return self
