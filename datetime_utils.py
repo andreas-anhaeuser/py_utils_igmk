@@ -191,11 +191,7 @@ def month_range(beg, end, inc=1):
     time = beg
     while time < end:
         times.append(time)
-        year = time.year
-        month = time.month
-        for i in range(inc):
-            year, month = next_month(year, month)
-        time = time.replace(year=year, month=month)
+        time = add_months(time, inc)
 
     return times
 
@@ -228,8 +224,7 @@ def year_range(beg, end, inc=1):
     time = beg
     while time < end:
         times.append(time)
-        year = times.year
-        time = time.replace(year=year+inc)
+        time = add_years(time, inc)
 
     return times
 
@@ -264,7 +259,6 @@ def months_in_interval(interval):
         months.append(month)
 
     return months
-        
 
 
 ###################################################
@@ -679,7 +673,7 @@ def add_months(time, number=1):
             year, month = previous_month(year, month)
     return time.replace(year=year, month=month)
 
-def add_years(time, number):
+def add_years(time, number=1):
     """Increase by number of years."""
     assert isinstance(time, dt.date)
     assert isinstance(number, int)
