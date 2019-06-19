@@ -40,7 +40,7 @@ class Record(object):
         if not isinstance(remove_multiple_appearances, bool):
             raise TypeError('remove_multiple_appearances must be str.')
 
-        self.filename = filename
+        self.filename = os.path.expanduser(filename)
         self.create_multiple_appearances = create_multiple_appearances
         self.remove_multiple_appearances = remove_multiple_appearances
         initialize(filename, overwrite=False)
