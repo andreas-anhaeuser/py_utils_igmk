@@ -266,7 +266,8 @@ def get_structured_namelist(lines, struc_sep='>', *args, **kwargs):
 def get_namelist(
         lines, name_end=':', sep=',', comment='#', ignore_char=' ',
         convert_to_number=False, conversion_error=False,
-        str_delims=_str_delims, strip_string_delimiters=True):
+        str_delims=_str_delims, strip_string_delimiters=True,
+        ):
     """Convert list of lines to dict.
 
         Parameters
@@ -325,6 +326,10 @@ def get_namelist(
         'area code' : '030',
         'average temperature' : '9.7',
         }
+
+        Special parameters
+        ------------------
+        'load_file', 'load_files' : additionally load this file to the setup
     """
     ###################################################
     # INITIALIZE                                      #
@@ -375,6 +380,29 @@ def get_namelist(
             data = data.strip(sep).split(sep)
             for n in range(len(data)):
                 data[n] = data[n].strip(ignore_char)
+
+        ###################################################
+        # LOAD SUB-FILE                                   #
+        ###################################################
+        if name in ('load_file', 'load_files'):
+            if not istinstance(data, list):
+                data = [data]
+            for filename in data:
+                sub_namelist = read_namelist(
+                        filename,
+                        name_end=name_end,
+                        sep=sep,
+                        comment=comment,
+                        ignore_char=ignore_char,
+                        convert_to_number=convert_to_number,
+                        conversion_error=conversion_error,
+                        str_delims=str_delims,
+                        strip_string_delimiters=strip_string_delimiters,
+                        )
+                for key in sub_namelist:
+                    namelist[key] = sub_namelist[key]
+                del sub_nl
+            continue
 
         ###################################################
         # FLOAT CONVERSION                                #
@@ -564,32 +592,22 @@ def column_list(
     ###################################################
     fmts = []
     for j in range(J):
-        # justify
-        if align[j] == 'l':
-            a = '<'
-        elif align[j] == 'c':
-            a = '^'
-        elif align[j] == 'r':
-            a = '>'
-
         # ========== digits  ============================= #
         # float
         if typ[j] in 'ef':
             # e.g. ' {:12.4f}'
-            d ='%1.0f.%1.0f' % (cw[j], prec[j]) + typ[j]
+            d ='1.%1.0f%s' % (prec[j], typ[j])
         # integer
         elif typ[j] == 'i':
-            d = '%1.0fd' % cw[j]
+            d = '1d'
         # string
         elif typ[j] == 's':
-            d = '%1.0f' % cw[j]
+            d = 's'
         else:
             raise NotImplementedError('')
 
         # formatter
-        fmt = '{:' + a + d + '}'    # e.g. ' {:<14}'
-        if j < J - 1:
-            fmt = fmt + sep
+        fmt = '{:' + d + '}'    # e.g. ' {:<14}'
         fmts.append(fmt)
 
     ###################################################
@@ -598,9 +616,21 @@ def column_list(
     for n in range(N):
         line = '\n'
         for j in range(J):
+            # cast to string
             word = fmts[j].format(data[j][n])
-            # if j < J - 1:
-                # word = word + sep
+
+            # add separator
+            if j < J - 1:
+                word = word + sep
+
+            # align
+            if align[j] == 'l':
+                word = word.ljust(cw[j])
+            elif align[j] == 'c':
+                word = word.center(cw[j])
+            elif align[j] == 'r':
+                word = word.rjust(cw[j])
+
             line = line + word
         text = text + line.rstrip()
 
