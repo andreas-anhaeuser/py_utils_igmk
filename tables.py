@@ -205,6 +205,7 @@ def read_namelist(filename, *args, **kwargs):
         -------
         Written in 2016-2019
     """
+    filename = os.path.expanduser(filename)
     if not os.path.isfile(filename):
         raise IOError('Cannot access file ' + filename)
 
@@ -267,6 +268,7 @@ def get_namelist(
         lines, name_end=':', sep=',', comment='#', ignore_char=' ',
         convert_to_number=False, conversion_error=False,
         str_delims=_str_delims, strip_string_delimiters=True,
+        multiple_appearance='error',
         ):
     """Convert list of lines to dict.
 
@@ -289,6 +291,11 @@ def get_namelist(
         conversion_error : bool, optional
             If True, an error is thrown on attempted number conversion on
             invalid string. Default: False
+        multiple_appearance : {'error', 'ignore', 'overwrite'}
+            Handles appearance of and already existing variable name.
+            - 'error' : raise KeyError
+            - 'ignore' : use value of first appearance
+            - 'overwrite' : use value of last appearance
 
         Returns
         -------
@@ -382,10 +389,17 @@ def get_namelist(
                 data[n] = data[n].strip(ignore_char)
 
         ###################################################
+        # SPECIAL KEYWORDS                                #
+        ###################################################
+        if name == 'multiple_appearance':
+            multiple_appearance = data
+            continue
+
+        ###################################################
         # LOAD SUB-FILE                                   #
         ###################################################
         if name in ('load_file', 'load_files'):
-            if not istinstance(data, list):
+            if not isinstance(data, list):
                 data = [data]
             for filename in data:
                 sub_namelist = read_namelist(
@@ -401,7 +415,7 @@ def get_namelist(
                         )
                 for key in sub_namelist:
                     namelist[key] = sub_namelist[key]
-                del sub_nl
+                del sub_namelist
             continue
 
         ###################################################
@@ -424,8 +438,13 @@ def get_namelist(
         ###################################################
         # WRITE TO DICT                                   #
         ###################################################
-        if name in namelist.keys():
-            raise KeyError(name + ' appears multiple times in namelist.')
+        if name in namelist:
+            if multiple_appearance == 'ignore':
+                continue
+            elif multiple_appearance == 'overwrite':
+                pass
+            else:
+                raise KeyError(name + ' appears multiple times in namelist.')
         namelist[name] = data
         
     return namelist
