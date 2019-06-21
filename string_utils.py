@@ -294,18 +294,25 @@ def highlighted_string_list(
 def progress_bar(
         fraction, length=79, fillcolor='', bgcolor='', delim_color=_BOLD,
         ):
-    """*Helper function. Return a nice progress bar as str. No '\n'."""
-    beg = delim_color + u'\u2595' + _ENDC
-    end = delim_color + u'\u258f' + _ENDC
+    """Return a nice progress bar as str."""
+    if delim_color in ('', None):
+        no_color = ''
+    else:
+        no_color = _ENDC
+    beg = delim_color + u'\u2595' + no_color
+    end = delim_color + u'\u258f' + no_color
 
     Nbar = length - 2
 
     # fraction > 1
     if fraction > 1:
-        left_inner = progress_bar_inner(fraction=1, length=Nbar,
-                fillcolor=fillcolor, bgcolor=bgcolor)
-        right_inner = progress_bar_inner(fraction=fraction-1, length=Nbar,
-                fillcolor=_YELLOW, bgcolor=bgcolor)
+        left_inner = progress_bar_inner(
+                fraction=1, length=Nbar, fillcolor=fillcolor, bgcolor=bgcolor,
+                )
+        right_inner = progress_bar_inner(
+                fraction=fraction-1, length=Nbar, fillcolor=_YELLOW,
+                bgcolor=bgcolor,
+                )
         line = beg + left_inner + right_inner
         
     # fraction < 0
@@ -314,8 +321,9 @@ def progress_bar(
 
     # 0 <= fraction <= 1 (regular case)
     else:
-        filling = progress_bar_inner(fraction, length=Nbar,
-                fillcolor=fillcolor, bgcolor=bgcolor)
+        filling = progress_bar_inner(
+                fraction, length=Nbar, fillcolor=fillcolor, bgcolor=bgcolor,
+                )
         line = beg + filling + end 
 
     return line

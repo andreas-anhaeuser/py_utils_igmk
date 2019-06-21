@@ -660,8 +660,10 @@ class Chronometer(object):
             delim_color = ''
             fillcolor = ''
         
-        bar = string_utils.progress_bar(fraction_done, bar_width,
-                fillcolor=fillcolor, delim_color=delim_color)
+        bar = string_utils.progress_bar(
+                fraction_done, bar_width, fillcolor=fillcolor,
+                delim_color=delim_color,
+                )
         text = text + ' ' * _col_width[0] + bar + '\n'
 
         # usermessage
