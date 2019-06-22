@@ -21,6 +21,7 @@ class ContextManager(unittest.TestCase):
         print('Outside context.')
         chrono.resumee()
         print('Outside context.')
+        sleep(1)
 
     def test_exit_function(self):
         N = 3
@@ -33,6 +34,7 @@ class ContextManager(unittest.TestCase):
         print('Inside context.')
         chrono.exit()
         print('Outside context.')
+        sleep(1)
 
     def test_exit_via_resumee(self):
         N = 3
@@ -45,6 +47,7 @@ class ContextManager(unittest.TestCase):
         print('Inside context.')
         chrono.resumee()
         print('Outside context.')
+        sleep(1)
 
 class BasicFunctionality(unittest.TestCase):
     def setUp(self):

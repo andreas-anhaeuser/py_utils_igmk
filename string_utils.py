@@ -293,14 +293,19 @@ def highlighted_string_list(
 ###################################################
 def progress_bar(
         fraction, length=79, fillcolor='', bgcolor='', delim_color=_BOLD,
+        use_color=True,
         ):
     """Return a nice progress bar as str."""
-    if delim_color in ('', None):
-        no_color = ''
+    if use_color:
+        endcolor = _ENDC
     else:
-        no_color = _ENDC
-    beg = delim_color + u'\u2595' + no_color
-    end = delim_color + u'\u258f' + no_color
+        endcolor = ''
+        fillcolor = ''
+        bgcolor = ''
+        delim_color=''
+
+    beg = delim_color + u'\u2595' + endcolor
+    end = delim_color + u'\u258f' + endcolor
 
     Nbar = length - 2
 
@@ -308,33 +313,47 @@ def progress_bar(
     if fraction > 1:
         left_inner = progress_bar_inner(
                 fraction=1, length=Nbar, fillcolor=fillcolor, bgcolor=bgcolor,
+                use_color=use_color,
                 )
         right_inner = progress_bar_inner(
                 fraction=fraction-1, length=Nbar, fillcolor=_YELLOW,
-                bgcolor=bgcolor,
+                bgcolor=bgcolor, use_color=use_color,
                 )
         line = beg + left_inner + right_inner
         
     # fraction < 0
     elif fraction < 0:
-        return progress_bar(-fraction, length=length, fillcolor=_YELLOW)
+        return progress_bar(
+                -fraction, length=length, fillcolor=_YELLOW,
+                use_color=use_color,
+                )
 
     # 0 <= fraction <= 1 (regular case)
     else:
         filling = progress_bar_inner(
                 fraction, length=Nbar, fillcolor=fillcolor, bgcolor=bgcolor,
+                use_color=use_color,
                 )
         line = beg + filling + end 
 
     return line
 
-def progress_bar_inner(fraction, length=77, fillcolor='', bgcolor=''):
+def progress_bar_inner(
+        fraction, length=77, fillcolor='', bgcolor='', use_color=True,
+        ):
     """*Helper function."""
     # N : integers
     # F : float
     # full : number of (entirely) filled columns
     # blank : number of (entirely) clear columns
     Nbar = length
+
+    if not use_color:
+        fillcolor = ''
+        bgcolor = ''
+        endcolor = ''
+    else:
+        endcolor = _ENDC
 
     Ffull = fraction * Nbar
     Nfull = int(Ffull)
@@ -353,7 +372,7 @@ def progress_bar_inner(fraction, length=77, fillcolor='', bgcolor=''):
             Nfull * block_full + \
             block_frac + \
             Nblank * ' ' + \
-            _ENDC
+            endcolor
     return filling
 
 def get_frac_block(Neighths):

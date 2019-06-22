@@ -656,13 +656,9 @@ class Chronometer(object):
         elif mode == 'resumee':
             fillcolor = _GREEN
 
-        if not self.print_colors:
-            delim_color = ''
-            fillcolor = ''
-        
         bar = string_utils.progress_bar(
                 fraction_done, bar_width, fillcolor=fillcolor,
-                delim_color=delim_color,
+                delim_color=delim_color, use_color=self.print_colors,
                 )
         text = text + ' ' * _col_width[0] + bar + '\n'
 
