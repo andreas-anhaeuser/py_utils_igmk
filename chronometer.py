@@ -407,6 +407,10 @@ class Chronometer(object):
         self.print_colors = print_colors
         self.time_step = time_step
         self.file = filename
+        if self.file is None:
+            self.file_initialized = True
+        else:
+            self.file_initialized = os.path.isfile(self.file)
         return self
 
     def set_info(self, info=''):
@@ -687,6 +691,8 @@ class Chronometer(object):
         if self.file is None:
             deleter = N * (_UPWARD + _CLEARLINE) + _UPWARD
             self._print(deleter)
+        elif not os.path.isfile(self.file):
+            pass
         else:
             with open(self.file, 'r') as fid:
                 lines = fid.readlines()
@@ -696,10 +702,33 @@ class Chronometer(object):
 
         return self
 
+    def _initialize_file(self):
+        if self.file is None:
+            return self
+
+        if self.file_initialized:
+            return self
+
+        if os.path.isfile(self.file):
+            self.file_initialized = True
+            return self
+
+        dirname = os.path.dirname(self.file)
+        if not os.path.isdir(dirname):
+            os.makedirs(dirname)
+
+        if not os.path.isfile(self.file):
+            with open(self.file, 'w'):
+                pass
+        self.file_initialized = True
+
+        return self
+
     def _print(self, text):
         if self.file is None:
             _builtin_print(text)
         else:
+            self._initialize_file()
             with open(self.file, 'a') as fid:
                 # fid.write((text + '\n').encode('utf-8'))
                 fid.write(text + '\n')
