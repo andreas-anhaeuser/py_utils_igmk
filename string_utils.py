@@ -189,6 +189,27 @@ def human_format(num, digits=2, sep='', mode='prefix', type='float'):
 
     return fmt % (num, prefix)
 
+def human_format_time(seconds):
+    """Return N.Mu or NNu or NNNu."""
+    value = seconds
+    units = 's'
+    if value > 300:
+        value /= 60
+        units = 'm'
+        if value > 300:
+            value /= 60
+            units = 'h'
+            if value > 100:
+                value /= 24
+                units = 'd'
+
+    if value >= 10:
+        fmt = '%1.0f'
+    else:
+        fmt = '%1.1f'
+
+    return fmt % value + units
+
 def percentage_string(fraction, sep=' '):
     """Return a str with a sensible number of digits.
         
