@@ -353,19 +353,35 @@ class Chronometer(object):
                 prefix + '(Type: ' + str(type) + ')')
         self.warning(text)
 
-    def debug_warning(self, module_name=None):
-        """Issue a DEBUG-mode warning."""
+    def debug_warning(self, show_warning=True, module_name=None):
+        """Issue a DEBUG-mode warning.
+
+            Parameters
+            ----------
+            show_warning : bool, optional
+                (default: True) If False, do nothing
+            module_name : str or None, optional
+                if None, module name will be determined automatically
+        """
+        if not show_warning:
+            return self
+
         # retrieve name of calling function
         if module_name is None:
             module_name = inspect.stack()[1][1]
 
+        # compose message (with fancy colors and so)
         if self.print_colors:
             text = (_BOLD + _RED + 'DEBUG' + _ENDC
                      + '-mode in '
                      + _BOLD + module_name + _ENDC)
         else:
             text = 'DEBUG-mode in ' + module_name
+
+        # issue message
         self.warning(text)
+
+        return self
 
     ###################################################
     # GETTERS                                         #
