@@ -97,6 +97,45 @@ class Record(object):
 
         return [line.strip() for line in lines]
 
+    def pop(self, index=-1):
+        """Remove and return item at index (default last).
+
+            Parameters
+            ----------
+            index : int, optional
+                (default: -1)
+            
+            Returns
+            -------
+            str : element at index position
+
+            Raises
+            ------
+            IndexError
+                record is empty or index is out of range.
+        """
+        # file does not exist
+        if not os.path.isfile(self.filename):
+            raise IndexError('pop from empty record')
+
+        # read file
+        with open(self.filename, 'r') as fid:
+            lines = fid.readlines()
+
+        # file empty
+        if not any(lines):
+            raise IndexError('pop from empty record')
+
+        # index out of range
+        L = len(lines)
+        if not -L <= index < L:
+            raise IndexError('pop index out of range')
+
+        # regular case
+        entry = lines[index]
+        self.remove(entry)
+        return entry
+
     def remove(self, entry):
         """Remove entry from record and return self."""
         remove(entry, self.filename, self.remove_multiple_appearances)
