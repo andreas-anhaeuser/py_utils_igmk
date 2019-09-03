@@ -720,8 +720,9 @@ def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
     ###################################################
     # INPUT CHECK                                     #
     ###################################################
-    assert isinstance(filename, str)
-    assert os.path.isfile(filename)
+    if not os.path.isfile(filename):
+        raise OSError('Not a file: %s' % filename)
+
     if sep is not None:
         assert isinstance(sep, str)
         assert len(sep) > 0
