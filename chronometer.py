@@ -191,10 +191,8 @@ class Chronometer(object):
         self.Nlines_last_message = 0
         self.show_message_times = show_message_times
 
-        # customize printing
-        # =================================================
-        # override builtin `print`
-        builtin.print = self.issue
+        # override builtin `print` with custom print function
+        self.use_object_print()
 
         # override default warning handling
         warnings.showwarning = self.custom_warning
@@ -261,7 +259,18 @@ class Chronometer(object):
         self.loop()
         self.show(usermessage=usermessage, force=force)
 
-    def issue(self, text, *args, **kwargs):
+    def issue(self, *args, **kwargs):
+        return self.print(*args, **kwargs)
+
+    def use_builtin_print(self):
+        builtin.print = _builtin_print
+        return self
+
+    def use_object_print(self):
+        builtin.print = self.print
+        return self
+
+    def print(self, text, *args, **kwargs):
         """Print time stamp and message."""
         if 'file' in kwargs:
             _builtin_print(text, *args, **kwargs)
@@ -327,9 +336,9 @@ class Chronometer(object):
     def warning(self, message, prefix='WARNING: '):
         """Issue a warning."""
         if self.print_colors:
-            self.issue(_YELLOW + prefix + _ENDC + str(message))
+            self.print(_YELLOW + prefix + _ENDC + str(message))
         else:
-            self.issue(prefix + str(message))
+            self.print(prefix + str(message))
 
     def custom_warning(self, *args, **kwargs):
         """Overwrite default implementation."""
