@@ -293,12 +293,14 @@ def highlighted_string_list(
         -------
         str
     """
+    # cast to str
+    words = [str(word) for word in words]
+
     # highlight one elemnt
     if n is not None:
         if not isinstance(n, int):
             raise TypeError('n must be int.')
         try:
-            words = copy(words)
             words[n] = start_hl + words[n] + end_hl
         except IndexError as e:
             if index_error:
