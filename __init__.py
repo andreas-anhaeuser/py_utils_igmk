@@ -3,6 +3,7 @@
 from . import chronometer
 from . import datetime_intervals
 from . import datetime_utils
+from . import filelock
 from . import fluids
 from . import geometry
 from . import humidity
