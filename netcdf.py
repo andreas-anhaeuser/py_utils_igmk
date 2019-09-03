@@ -963,3 +963,18 @@ def cast(data, nctype):
             found = True
     assert found, 'could not find nctype ' + nctype
     return np.array(x, dtype=dtype)
+
+def read_variable(fid, varname):
+    dtypes_str = ('c', 'S1')
+    vid = fid.variables[varname]
+    dtype = vid.dtype
+    if dtype in dtypes_str:
+        return read_string_variable(fid, varname)
+    else:
+        return vid[:]
+
+def read_string_variable(fid, varname):
+    vid = fid.variables[varname]
+    array = vid[:]
+    strings = [x.tostring().decode().strip('\0') for x in array]
+    return strings
