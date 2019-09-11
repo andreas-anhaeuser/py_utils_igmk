@@ -411,6 +411,10 @@ def datetime_to_julian_days(time):
 ###################################################
 # DAY OF YEAR                                     #
 ###################################################
+def day_of_year(*args, **kwargs):
+    """Alias to doy()."""
+    return doy(*args, **kwargs)
+
 def doy(date):
     """Return day of year and year as pair of ints.
 

@@ -487,6 +487,7 @@ def str2num(s, str_delims=_str_delims):
 def column_list(
         headers, data, typ='s', align='l', column_width=16, precision=7,
         filename=None, comment_top=None, comment_bottom=None, sep=' ',
+        comment_str='# ',
         ):
     """Write an ascii file with aligned columns.
 
@@ -587,7 +588,7 @@ def column_list(
     line = ''
     for j in range(J):
         if j == 0:
-            word = '# ' + headers[j]
+            word = comment_str + headers[j]
         else:
             word = headers[j]
 
@@ -660,14 +661,14 @@ def column_list(
         lines = comment_top.split('\n')
         N = len(lines)
         for n in range(N):
-            lines[n] = '# ' + lines[n] + '\n'
+            lines[n] = comment_str + lines[n] + '\n'
         text = ''.join(lines) + text
 
     if comment_bottom is not None:
         lines = comment_bottom.split('\n')
         N = len(lines)
         for n in range(N):
-            lines[n] = '\n# ' + lines[n]
+            lines[n] = '\n' + comment_str + lines[n]
         text = text + ''.join(lines)
 
     # add final eol:
@@ -695,8 +696,10 @@ def get_column_list(*args, **kwargs):
     """Alias to read_column_list."""
     return read_column_list(*args, **kwargs)
 
-def read_column_list(filename, sep=None, skip_rows=0, comment_str='#',
-        skip_invalid_rows=False, set_to_lowercase=False):
+def read_column_list(
+        filename, sep=None, skip_rows=0, comment_str='#',
+        skip_invalid_rows=False, set_to_lowercase=False,
+        ):
     """Read text file structured in columns and return as list of lists.
     
         Parameters
@@ -859,6 +862,8 @@ def read_column_list_with_headers(
             vals_tmp = copy(values)
             for nval, val in enumerate(vals_tmp):
                 if val == nan_str:
+                    vals_tmp[nval] = 'nan'
+                elif val == '':
                     vals_tmp[nval] = 'nan'
 
             # try to convert to floats
