@@ -548,3 +548,32 @@ def clear_screen():
 def clear_line():
     """Return a str."""
     return _CLEARLINE
+
+################################################################
+# crop                                                         #
+################################################################
+def crop(s, word):
+    """Remove leading and trailing appearences of `word`."""
+    s = lcrop(s, word)
+    s = rcrop(s, word)
+    return s
+
+def lcrop(s, word):
+    """Remove leading appearences of `word`."""
+    if s == '':
+        return s
+
+    L = len(word)
+    while s.startswith(word):
+        s = s[L:]
+    return s
+
+def rcrop(s, word):
+    """Remove trailing appearences of `word`."""
+    if s == '':
+        return s
+
+    L = len(word)
+    while s.endswith(word):
+        s = s[:-L]
+    return s
