@@ -483,7 +483,7 @@ def date_from_doy(doy, year):
     """
     return dt.date(year, 1, 1) + dt.timedelta(days=doy-1)
 
-def datetime_from_doy(doy, year):
+def datetime_from_doy(doy, year, hour=0, minute=0, second=0, microsecond=0):
     """Return a datetime.date.
 
         Parameters
@@ -500,7 +500,9 @@ def datetime_from_doy(doy, year):
         ----
         1st January is DOY 1 (not 0).
     """
-    return dt.datetime(year, 1, 1) + dt.timedelta(days=doy-1)
+    base = dt.datetime(year, 1, 1, hour, minute, second, microsecond)
+    increment = dt.timedelta(days=doy-1)
+    return base + increment
 
 def days_in_month(date):
     """Return the number of days of that month.
