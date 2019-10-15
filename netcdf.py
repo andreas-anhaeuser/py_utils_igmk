@@ -33,7 +33,9 @@ from . import string_utils as aa_str
 #################################################
 # FUNCTIONS USING VARTABLES                     #
 #################################################
-def read_file(filename, varnames=None, ignore_varnames=[]):
+def read_file(
+        filename, varnames=None, ignore_varnames=[], str_method='regular',
+        ):
     """Return content of netcdf file in two dicts.
 
         Parameters
@@ -44,6 +46,8 @@ def read_file(filename, varnames=None, ignore_varnames=[]):
             if given, only these variables are loaded
         ignore_varnames : list of str, optional
             these are ignored, even if explicitly listed in `varnames`
+        str_method : str
+            (e. g. 'regular', 'utf8', ...)
 
         Returns
         -------
@@ -52,6 +56,7 @@ def read_file(filename, varnames=None, ignore_varnames=[]):
 
         History
         -------
+        2019-09-20 (AA): Add dimension loader
         2018-01-03 (AA): Created
     """
     fn_long = filename
@@ -62,381 +67,35 @@ def read_file(filename, varnames=None, ignore_varnames=[]):
     data = {}
     meta = {}
 
-    with Dataset(fn_long, 'r') as nc:
+    with Dataset(fn_long, 'r') as fid:
         # create list of variable names to load
-        varnames_file = nc.variables.keys()
+        varnames_file = fid.variables.keys()
         if varnames is not None:
             varnames_load = varnames
         else:
             varnames_load = varnames_file
 
-        for vn in varnames_load:
+        for varname in varnames_load:
             # ignore
-            if vn in ignore_varnames:
+            if varname in ignore_varnames:
                 continue
 
             # variable not in file
-            if vn not in varnames_file:
-                raise IOError('Variable "%s" not in file %s.' % (vn, filename))
+            if varname not in varnames_file:
+                raise IOError(
+                        'Variable "%s" not in file %s'
+                        % (varname, filename)
+                        )
 
             # load
-            vid = nc[vn]
-            data[vn] = vid[:]
+            data[varname] = read_variable(fid, varname, method=str_method)
+            vid = fid[varname]
             attnames = vid.ncattrs()
-            meta[vn] = {}
-            for an in attnames:
-                meta[vn][an] = vid.getncattr(an)
+            meta[varname] = {}
+            meta[varname]['dimensions'] = vid.dimensions
+            for attname in attnames:
+                meta[varname][attname] = vid.getncattr(attname)
 
-    return data, meta
-
-def read_file_old(
-        filename,
-        vartable=None,
-        read_atts=True,
-        ignore_key_errors=False,
-        read_dims=True,
-        messages=True,
-        merge_strings=True,
-        ):
-    """Return two dictionaries.
-
-    Parameters
-    ----------
-    filename : str
-        path to the nc-file
-    vartable : str, optional
-        path to the vartable file
-    read_atts : bool, optional
-        if True, then all variable attributes are read. Attributes that have
-        same name as a header in the variable table are ignored. Default is
-        True.
-    ignore_key_errors : bool, optional
-    messages : bool, optional
-        Issue warning and info messages on screen or not.
-    merge_strings : bool, optional
-        If True, 2d-character matrices are converted to arrays of strings
-
-
-    Returns
-    -------
-    (dict, dict)
-        The first dictionary contains the variable values.
-        The seconds dictionary consists itself of dictionaries which contains
-        meta information.
-
-
-    Note
-    ----
-    If no vartable is specified, then all variables are read.
-
-    The vartable file must be of the following shape:
-
-    py_name     | nc_name | gain | offset | other_optional_headers
-    ------------+---------+------+--------+-----------------------
-    varname1    | ncvn1   |    1 |      0 | further info
-    varname2    | ncvn2   | 1000 |      0 | further info
-    ...
-
-    All headers except py_name and nc_name are optional. 
-    
-    py_units :
-    The header py_units is converted to the key 'units'.
-
-    gain, offset : 
-    If gain and/or offset are given, they must be numbers. If there are no
-    headers called 'gain' and/or 'offset', the values will be set to 1 and/or
-    0, respectively for all variables. They are used for conversions:
-
-        py_value = nc_value * gain + offset
-
-
-    Example
-    -------
-    For example, if height is given in km above ground in the nc-file and you
-    want it in meters above sea level in your python variable, your table will
-    look something like this, assuming the ground to be 205m ASL:
-
-    py_name  | nc_name    | gain | offset | long_name              | py_units
-    ---------+------------+------+--------+------------------------+---------
-    height   | elevation  | 1000 |    205 | height above sea level |        m
-    varname2 | ncvn2      |    1 |      0 | long variable name     |    kg/mK
-
-    General netcdf write information
-    --------------------------------
-    For general information see 
-    http://gfesuite.noaa.gov/developer/netCDFPythonInterface.html
-
-    Author
-    ------
-    Written in 2015
-    by Andreas Anhaeuser
-    Insitute for Geophysics and Meteorology
-    University of Cologne
-    Germany
-    <anhaues@meteo.uni-koeln.de>
-    """
-    if not os.path.isfile(filename):
-        raise IOError('Cannot find file ' + filename)
-
-    if vartable is None:
-        return read_file_without_vartable(
-                filename=filename, read_atts=read_atts)
-
-    ###################################
-    # READ VARTABLE                   #
-    ###################################
-    vt = open(vartable, 'r')
-    nc = ncfile(filename, 'r')
-
-    init = False
-    for line in vt:
-        # the last word is removed because it is just the new line character:
-        words = line.split('|')[:-1]
-
-        # delete leading and trailing white spaces:
-        for i in range(len(words)):
-            word = words[i]
-            while len(word) > 0 and word[0] == ' ':
-                word = word[1:]
-            while len(word) > 0 and word[-1] == ' ':
-                word = word[:-1]
-            words[i] = word
-
-        ###############################
-        # HEADER LINE                 #
-        ###############################
-        if not init:
-            keys   = []
-            keypos = []
-            pypos     = None  # py_name position
-            ncpos     = None  # nc_name position
-            isvarpos  = None  # nc_name position
-            gainpos   = None  # gain position
-            offsetpos = None  # offset position
-            otherpos = []     # position of remaining headers
-
-            i = 0
-            for word in words:
-                if word == 'py_name':
-                    pypos = i
-                elif word == 'nc_name':
-                    ncpos = i
-                elif word == 'is_var':
-                    isvarpos = i
-                elif word == 'gain':
-                    gainpos = i
-                elif word == 'offset':
-                    offsetpos = i
-                else:
-                    otherpos.append(i)
-                # change header 'py_units' to key 'units':
-                if word == 'py_units':
-                    word = 'units'
-                keys.append(word)
-                i += 1
-
-            # initialize:
-            data = {}
-            meta = {} 
-            Ncols = len(words)
-            init = True
-
-            # next line:
-            continue
-        
-        ###############################
-        # SKIP SEPERATOR LINES        #
-        ###############################
-        if len(words) != Ncols: 
-            continue
-
-        ###############################
-        # SKIP COMMENT LINES          #
-        ###############################
-        if any(words[0]) and words[0][0] == '#':
-            continue
-
-        pykey = words[pypos]
-        nckey = words[ncpos]
-
-        ###############################
-        # VARIABLE ?                  #
-        ###############################
-        if isvarpos is None:
-            isvar = True
-        elif words[isvarpos] in ['', '0']:
-            isvar = False
-        else:
-            isvar = True
-
-        if not isvar and not read_dims:
-            continue
-
-        ###############################
-        # READ DIMENSION              #
-        ###############################
-        if not isvar and read_dims:
-            try:
-                data[pykey] = np.arange(nc.dimensions[nckey])
-                meta[pykey] = {'is_dim': '1'}
-                continue
-            except KeyError as error:
-                if messages:
-                    print('WARNING: No dimension named "' + nckey + 
-                            '" in nc-file ' + filename)
-                # next line:
-                continue
-            else:
-                raise error
-
-        ###############################
-        # READ DATA                   #
-        ###############################
-        try:
-            raw = nc.variables[nckey].getValue()
-        except KeyError as error:
-            if ignore_key_errors:
-                if messages:
-                    print('WARNING: No variable named "' + nckey + 
-                            '" in nc-file ' + filename)
-                # next line:
-                continue
-            else:
-                raise error
-
-
-        #################################
-        # GAIN AND OFFSET FROM FILE     #
-        #################################
-        meta[pykey] = {}
-        varid = nc.variables[nckey]
-        typechar = varid.typecode()
-        offset  = 0
-        scale   = 1
-        filler  = np.nan
-        missing = np.nan
-        val_min = np.nan
-        val_max = np.nan
-
-        # read variable attributes
-        # get attribute list
-        attnames = dir(varid)
-        for attname in attnames:
-            if attname == 'assignValue':
-                continue
-            if attname == 'getValue':
-                continue
-            if attname == 'typecode':
-                continue
-            if attname == '_FillValue':
-                filler = getattr(varid, attname)[0]
-            if attname == 'missing_value':
-                missing = getattr(varid, attname)[0]
-            if attname == 'valid_min':
-                val_min = getattr(varid, attname)[0]
-            if attname == 'valid_max':
-                val_max = getattr(varid, attname)[0]
-            if attname == 'valid_range':
-                val_min, val_max = getattr(varid, attname)
-            if attname == 'add_offset':
-                offset = getattr(varid, attname)[0]
-                continue
-            if attname == 'scale_factor':
-                scale = getattr(varid, attname)[0]
-                continue
-            if read_atts and attname not in keys:
-                meta[pykey][attname] = getattr(varid, attname)
-
-
-        # exclude invalid data:
-        shape = np.shape(raw)
-        if typechar in 'df' and read_atts:
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore')
-                if isinstance(raw, Iterable):
-                    if not np.isnan(filler):
-                        raw[raw==filler] = np.nan
-                    if not np.isnan(missing):
-                        raw[raw==filler] = np.nan
-                    if not np.isnan(val_min):
-                        raw[raw < val_min] = np.nan
-                    if not np.isnan(val_max):
-                        raw[raw > val_max] = np.nan
-                else:
-                    if not np.isnan(filler) and raw==filler:
-                        raw = np.nan
-                    if not np.isnan(missing) and raw==filler:
-                        raw = np.nan
-                    if not np.isnan(val_min) and raw < val_min:
-                        raw = np.nan
-                    if not np.isnan(val_max) and raw > val_max:
-                        raw = np.nan
-
-        if typechar not in 'c' and read_atts:
-            scaled = scale * raw + offset
-        else:
-            scaled = raw
-        
-        #################################
-        # GAIN AND OFFSET FROM VARTABLE #
-        #################################
-        # gain:
-        if gainpos is None:
-            gain = 1
-        elif words[gainpos] == '':
-            gain = 1
-        else:
-            gain = float(words[gainpos])
-        # avoid cast from int to float if not necessary
-        if int(gain) == gain:
-            gain = int(gain)
-
-        # offset:
-        if offsetpos is None:
-            offset = 0
-        elif words[offsetpos] == '':
-            offset = 0
-        else:
-            offset = float(words[offsetpos])
-        # avoid cast from int to float if not necessary
-        if int(offset) == offset:
-            offset = int(offset)
-
-        # scale:
-        if raw.dtype != 'S1':
-            data[pykey] = scaled * gain + offset
-        else:
-            data[pykey] = scaled 
-
-        ###################################################
-        # MERGE STRINGS                                   #
-        ###################################################
-        if raw.dtype == 'S1' and len(np.shape(scaled)) == 2:
-            data[pykey] = map(''.join, scaled)
-
-        ###############################
-        # ADD META DATA               #
-        ###############################
-        for i in range(Ncols):
-            if i not in otherpos:
-                continue
-            meta[pykey][keys[i]] = words[i]
-
-    ###############################
-    # READ GLOBAL ATTRIBUTES      #
-    ###############################
-    if read_atts:
-        if 'glob' not in meta.keys():
-            meta['glob'] = {}
-        gatts = dir(nc)
-        ignore = ['close', 'createDimension', 'createVariable', 'flush','sync']
-        for gatt in gatts:
-            if gatt in ignore:
-                continue
-            meta['glob'][gatt] = getattr(nc, gatt)
-
-    nc.close()
-    vt.close()
     return data, meta
 
 def write_file(
@@ -811,26 +470,85 @@ def write_file(
 #################################################
 # HELPER FUNCTIONS                              #
 #################################################
-def read_file_without_vartable(filename, read_atts=True):
+def cast(data, nctype):
+    if nctype == 'c':
+        return data
+
+    # scalar handling:
+    if np.isscalar(data):
+        x = cast(np.array([data]), nctype)
+        return x[0]
+
+    if nctype == 'f':
+        return np.array(data, dtype=np.float32)
+
+    ###################################################
+    # INT TYPES                                       #
+    ###################################################
+    inttypes = {
+            'i8' : [np.int64, -2**64, 2**64 - 1],
+            'i'  : [np.int32, -2**31, 2**31 - 1],
+            'h'  : [np.uint16,     0, 2**16 - 1],
+            's'  : [np.int16, -2**15, 2**15 - 1],
+            }
+
+    found = False
+    for inttype in inttypes.keys():
+        if nctype == inttype:
+            dtype = inttypes[inttype][0]
+            lo = inttypes[inttype][1]
+            hi = inttypes[inttype][2]
+            if lo < 0:
+                filler = lo
+            else:
+                filler = hi
+            x = np.round(data)
+            x[np.isnan(x)] = filler
+            assert np.min(x) >= lo,   'Value(s) too small for' + inttype
+            assert np.max(x) <= hi,   'Value(s) too large for' + inttype
+            found = True
+    assert found, 'could not find nctype ' + nctype
+    return np.array(x, dtype=dtype)
+
+def read_variable(fid, varname, method='regular'):
+    dtypes_str = ('c', 'S1')
+    vid = fid.variables[varname]
+    dtype = vid.dtype
+    if dtype in dtypes_str:
+        return read_string_variable(fid, varname, method)
+    else:
+        return vid[:]
+
+def read_string_variable(fid, varname, method='regular'):
+    raw = fid.variables[varname][:]
+    if method == 'regular':
+        return [x.tostring().decode().strip('\0') for x in raw]
+    elif method == 'utf8':
+        return [''.join([b.decode('UTF-8') for b in line]) for line in raw]
+
+################################################################
+# deprecated                                                   #
+################################################################
+def read_file_without_vartable_old(filename, read_atts=True):
     """*Return two dictionaries.
 
-    Parameters
-    ----------
-    filename : str
-        path to the nc-file
-    read_atts : bool, optional
-        if True, then all variable attributes are read. Default: True
+        Parameters
+        ----------
+        filename : str
+            path to the nc-file
+        read_atts : bool, optional
+            if True, then all variable attributes are read. Default: True
 
-    Returns
-    -------
-    (dict, dict)
-        The first dictionary contains the variable values.
-        The seconds dictionary consist itself of dictionaries which contains
-        meta information.
+        Returns
+        -------
+        (dict, dict)
+            The first dictionary contains the variable values. The second
+            dictionary consist itself of dictionaries which contains meta
+            information.
 
-    Note
-    ----
-    This is designed as a helper function to read_file()
+        Note
+        ----
+        This is designed as a helper function to read_file()
     """
     # open file
     fid = ncfile(filename, 'r')
@@ -924,57 +642,352 @@ def read_file_without_vartable(filename, read_atts=True):
     fid.close()
     return data, meta
 
-def cast(data, nctype):
-    if nctype == 'c':
-        return data
+def read_file_old(
+        filename,
+        vartable=None,
+        read_atts=True,
+        ignore_key_errors=False,
+        read_dims=True,
+        messages=True,
+        merge_strings=True,
+        ):
+    """Return two dictionaries.
 
-    # scalar handling:
-    if np.isscalar(data):
-        x = cast(np.array([data]), nctype)
-        return x[0]
+    Parameters
+    ----------
+    filename : str
+        path to the nc-file
+    vartable : str, optional
+        path to the vartable file
+    read_atts : bool, optional
+        if True, then all variable attributes are read. Attributes that have
+        same name as a header in the variable table are ignored. Default is
+        True.
+    ignore_key_errors : bool, optional
+    messages : bool, optional
+        Issue warning and info messages on screen or not.
+    merge_strings : bool, optional
+        If True, 2d-character matrices are converted to arrays of strings
 
-    if nctype == 'f':
-        return np.array(data, dtype=np.float32)
 
-    ###################################################
-    # INT TYPES                                       #
-    ###################################################
-    inttypes = {
-            'i8' : [np.int64, -2**64, 2**64 - 1],
-            'i'  : [np.int32, -2**31, 2**31 - 1],
-            'h'  : [np.uint16,     0, 2**16 - 1],
-            's'  : [np.int16, -2**15, 2**15 - 1],
-            }
+    Returns
+    -------
+    (dict, dict)
+        The first dictionary contains the variable values.
+        The seconds dictionary consists itself of dictionaries which contains
+        meta information.
 
-    found = False
-    for inttype in inttypes.keys():
-        if nctype == inttype:
-            dtype = inttypes[inttype][0]
-            lo = inttypes[inttype][1]
-            hi = inttypes[inttype][2]
-            if lo < 0:
-                filler = lo
+
+    Note
+    ----
+    If no vartable is specified, then all variables are read.
+
+    The vartable file must be of the following shape:
+
+    py_name     | nc_name | gain | offset | other_optional_headers
+    ------------+---------+------+--------+-----------------------
+    varname1    | ncvn1   |    1 |      0 | further info
+    varname2    | ncvn2   | 1000 |      0 | further info
+    ...
+
+    All headers except py_name and nc_name are optional. 
+    
+    py_units :
+    The header py_units is converted to the key 'units'.
+
+    gain, offset : 
+    If gain and/or offset are given, they must be numbers. If there are no
+    headers called 'gain' and/or 'offset', the values will be set to 1 and/or
+    0, respectively for all variables. They are used for conversions:
+
+        py_value = nc_value * gain + offset
+
+
+    Example
+    -------
+    For example, if height is given in km above ground in the nc-file and you
+    want it in meters above sea level in your python variable, your table will
+    look something like this, assuming the ground to be 205m ASL:
+
+    py_name  | nc_name    | gain | offset | long_name              | py_units
+    ---------+------------+------+--------+------------------------+---------
+    height   | elevation  | 1000 |    205 | height above sea level |        m
+    varname2 | ncvn2      |    1 |      0 | long variable name     |    kg/mK
+
+    General netcdf write information
+    --------------------------------
+    For general information see 
+    http://gfesuite.noaa.gov/developer/netCDFPythonInterface.html
+
+    Author
+    ------
+    Written in 2015
+    by Andreas Anhaeuser
+    Insitute for Geophysics and Meteorology
+    University of Cologne
+    Germany
+    <anhaues@meteo.uni-koeln.de>
+    """
+    if not os.path.isfile(filename):
+        raise IOError('Cannot find file ' + filename)
+
+    if vartable is None:
+        return read_file_without_vartable(
+                filename=filename, read_atts=read_atts)
+
+    ###################################
+    # READ VARTABLE                   #
+    ###################################
+    vt = open(vartable, 'r')
+    nc = ncfile(filename, 'r')
+
+    init = False
+    for line in vt:
+        # the last word is removed because it is just the new line character:
+        words = line.split('|')[:-1]
+
+        # delete leading and trailing white spaces:
+        for i in range(len(words)):
+            word = words[i]
+            while len(word) > 0 and word[0] == ' ':
+                word = word[1:]
+            while len(word) > 0 and word[-1] == ' ':
+                word = word[:-1]
+            words[i] = word
+
+        ###############################
+        # HEADER LINE                 #
+        ###############################
+        if not init:
+            keys   = []
+            keypos = []
+            pypos     = None  # py_name position
+            ncpos     = None  # nc_name position
+            isvarpos  = None  # nc_name position
+            gainpos   = None  # gain position
+            offsetpos = None  # offset position
+            otherpos = []     # position of remaining headers
+
+            i = 0
+            for word in words:
+                if word == 'py_name':
+                    pypos = i
+                elif word == 'nc_name':
+                    ncpos = i
+                elif word == 'is_var':
+                    isvarpos = i
+                elif word == 'gain':
+                    gainpos = i
+                elif word == 'offset':
+                    offsetpos = i
+                else:
+                    otherpos.append(i)
+                # change header 'py_units' to key 'units':
+                if word == 'py_units':
+                    word = 'units'
+                keys.append(word)
+                i += 1
+
+            # initialize:
+            data = {}
+            meta = {} 
+            Ncols = len(words)
+            init = True
+
+            # next line:
+            continue
+        
+        ###############################
+        # SKIP SEPERATOR LINES        #
+        ###############################
+        if len(words) != Ncols: 
+            continue
+
+        ###############################
+        # SKIP COMMENT LINES          #
+        ###############################
+        if any(words[0]) and words[0][0] == '#':
+            continue
+
+        pykey = words[pypos]
+        nckey = words[ncpos]
+
+        ###############################
+        # VARIABLE ?                  #
+        ###############################
+        if isvarpos is None:
+            isvar = True
+        elif words[isvarpos] in ['', '0']:
+            isvar = False
+        else:
+            isvar = True
+
+        if not isvar and not read_dims:
+            continue
+
+        ###############################
+        # READ DIMENSION              #
+        ###############################
+        if not isvar and read_dims:
+            try:
+                data[pykey] = np.arange(nc.dimensions[nckey])
+                meta[pykey] = {'is_dim': '1'}
+                continue
+            except KeyError as error:
+                if messages:
+                    print('WARNING: No dimension named "' + nckey + 
+                            '" in nc-file ' + filename)
+                # next line:
+                continue
             else:
-                filler = hi
-            x = np.round(data)
-            x[np.isnan(x)] = filler
-            assert np.min(x) >= lo,   'Value(s) too small for' + inttype
-            assert np.max(x) <= hi,   'Value(s) too large for' + inttype
-            found = True
-    assert found, 'could not find nctype ' + nctype
-    return np.array(x, dtype=dtype)
+                raise error
 
-def read_variable(fid, varname):
-    dtypes_str = ('c', 'S1')
-    vid = fid.variables[varname]
-    dtype = vid.dtype
-    if dtype in dtypes_str:
-        return read_string_variable(fid, varname)
-    else:
-        return vid[:]
+        ###############################
+        # READ DATA                   #
+        ###############################
+        try:
+            raw = nc.variables[nckey].getValue()
+        except KeyError as error:
+            if ignore_key_errors:
+                if messages:
+                    print('WARNING: No variable named "' + nckey + 
+                            '" in nc-file ' + filename)
+                # next line:
+                continue
+            else:
+                raise error
 
-def read_string_variable(fid, varname):
-    vid = fid.variables[varname]
-    array = vid[:]
-    strings = [x.tostring().decode().strip('\0') for x in array]
-    return strings
+
+        #################################
+        # GAIN AND OFFSET FROM FILE     #
+        #################################
+        meta[pykey] = {}
+        varid = nc.variables[nckey]
+        typechar = varid.typecode()
+        offset  = 0
+        scale   = 1
+        filler  = np.nan
+        missing = np.nan
+        val_min = np.nan
+        val_max = np.nan
+
+        # read variable attributes
+        # get attribute list
+        attnames = dir(varid)
+        for attname in attnames:
+            if attname == 'assignValue':
+                continue
+            if attname == 'getValue':
+                continue
+            if attname == 'typecode':
+                continue
+            if attname == '_FillValue':
+                filler = getattr(varid, attname)[0]
+            if attname == 'missing_value':
+                missing = getattr(varid, attname)[0]
+            if attname == 'valid_min':
+                val_min = getattr(varid, attname)[0]
+            if attname == 'valid_max':
+                val_max = getattr(varid, attname)[0]
+            if attname == 'valid_range':
+                val_min, val_max = getattr(varid, attname)
+            if attname == 'add_offset':
+                offset = getattr(varid, attname)[0]
+                continue
+            if attname == 'scale_factor':
+                scale = getattr(varid, attname)[0]
+                continue
+            if read_atts and attname not in keys:
+                meta[pykey][attname] = getattr(varid, attname)
+
+
+        # exclude invalid data:
+        shape = np.shape(raw)
+        if typechar in 'df' and read_atts:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                if isinstance(raw, Iterable):
+                    if not np.isnan(filler):
+                        raw[raw==filler] = np.nan
+                    if not np.isnan(missing):
+                        raw[raw==filler] = np.nan
+                    if not np.isnan(val_min):
+                        raw[raw < val_min] = np.nan
+                    if not np.isnan(val_max):
+                        raw[raw > val_max] = np.nan
+                else:
+                    if not np.isnan(filler) and raw==filler:
+                        raw = np.nan
+                    if not np.isnan(missing) and raw==filler:
+                        raw = np.nan
+                    if not np.isnan(val_min) and raw < val_min:
+                        raw = np.nan
+                    if not np.isnan(val_max) and raw > val_max:
+                        raw = np.nan
+
+        if typechar not in 'c' and read_atts:
+            scaled = scale * raw + offset
+        else:
+            scaled = raw
+        
+        #################################
+        # GAIN AND OFFSET FROM VARTABLE #
+        #################################
+        # gain:
+        if gainpos is None:
+            gain = 1
+        elif words[gainpos] == '':
+            gain = 1
+        else:
+            gain = float(words[gainpos])
+        # avoid cast from int to float if not necessary
+        if int(gain) == gain:
+            gain = int(gain)
+
+        # offset:
+        if offsetpos is None:
+            offset = 0
+        elif words[offsetpos] == '':
+            offset = 0
+        else:
+            offset = float(words[offsetpos])
+        # avoid cast from int to float if not necessary
+        if int(offset) == offset:
+            offset = int(offset)
+
+        # scale:
+        if raw.dtype != 'S1':
+            data[pykey] = scaled * gain + offset
+        else:
+            data[pykey] = scaled 
+
+        ###################################################
+        # MERGE STRINGS                                   #
+        ###################################################
+        if raw.dtype == 'S1' and len(np.shape(scaled)) == 2:
+            data[pykey] = map(''.join, scaled)
+
+        ###############################
+        # ADD META DATA               #
+        ###############################
+        for i in range(Ncols):
+            if i not in otherpos:
+                continue
+            meta[pykey][keys[i]] = words[i]
+
+    ###############################
+    # READ GLOBAL ATTRIBUTES      #
+    ###############################
+    if read_atts:
+        if 'glob' not in meta.keys():
+            meta['glob'] = {}
+        gatts = dir(nc)
+        ignore = ['close', 'createDimension', 'createVariable', 'flush','sync']
+        for gatt in gatts:
+            if gatt in ignore:
+                continue
+            meta['glob'][gatt] = getattr(nc, gatt)
+
+    nc.close()
+    vt.close()
+    return data, meta
