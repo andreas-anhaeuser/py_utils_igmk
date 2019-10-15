@@ -836,6 +836,21 @@ class Season(object):
         bounds = interval.get_bounds()
         return cls(*bounds, allow_whole_year=allow_whole_year)
 
+    @classmethod
+    def from_tuple(cls, beg, end, allow_whole_year=True):
+        """Shorthand constructer using datetime args as tuples.
+            
+            beg : tuple, length >= 2
+                interpreted as month, day, [hour, minute, second, microsecond]
+            end : tuple, length >= 2
+                interpreted as month, day, [hour, minute, second, microsecond]
+            allow_whole_day : bool or None
+                if None, True is assumed for intervals of finite length
+        """
+        dt_beg = dt.datetime(1, *beg)
+        dt_end = dt.datetime(1, *end)
+        return cls(dt_beg, dt_end, allow_whole_year=allow_whole_year)
+
     def __repr__(self):
         """Return a str."""
         return 'Season ' + str(self)
