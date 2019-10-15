@@ -98,7 +98,7 @@ def datetime_range(beg, end, inc, season_of_year=None, daytime_period=None):
         inc : dt.timedelta
         season_of_year : Season, optional
             Default: whole year
-        daytime_period : DaytimePeriod, optiona
+        daytime_period : DaytimePeriod, optional
             Default : whole day
 
         Tested

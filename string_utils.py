@@ -270,7 +270,7 @@ def ordinal_str(number):
 # COLOR FORMATTING                                #
 ###################################################
 def highlighted_string_list(
-        words, n=None, sep=', ', start_hl=_BOLD, end_hl=_ENDC,
+        words, n=None, sep='|', start_hl=_BOLD, end_hl=_ENDC,
         index_error=False,
         ):
     """Return a string with one element highlighted.

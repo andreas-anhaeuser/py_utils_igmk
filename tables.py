@@ -522,7 +522,6 @@ def column_list(
     ###################################################
     # INPUT CHECK                                     #
     ###################################################
-
     # ========== helper functions  ======================= #
     def expand(x, J):
         """Expand variable to length J if it is singleton."""
