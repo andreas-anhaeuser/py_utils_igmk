@@ -208,6 +208,9 @@ class Chronometer(object):
         self.exit()
         self.resumee()
 
+    def __del__(self):
+        self.exit()
+
     ###################################################
     # USER FUNCTIONS                                  #
     ###################################################
@@ -222,14 +225,16 @@ class Chronometer(object):
         """Equivalent to self.increase_count(1)."""
         self.count += loops
 
-    def show(self, usermessage=None, force=None, mode=None, wrap=70):
+    def show(self, usermessage=None, force=None, mode=None, wrap=True):
         """Update screen."""
         # set force to True of False
         if force is None:
-            if usermessage is None:
-                force = False
-            else:
+            if self.count < 2:
                 force = True
+            elif usermessage is not None:
+                force = True
+            else:
+                force = False
 
         # check if need to show
         now = dt.datetime.now()
@@ -241,6 +246,9 @@ class Chronometer(object):
         python_version = sys.version_info[0]    # (int)
         if python_version < 3:
             usermessage = unicode(usermessage)
+
+        if wrap is True:
+            wrap = self.get_wrap_length()
 
         if wrap and (usermessage is not None):
             lines = textwrap.wrap(
@@ -299,9 +307,7 @@ class Chronometer(object):
         # wrap text ----------------------------------
         if wrap:
             if isinstance(wrap, bool):
-                with os.popen('stty size', 'r') as fid:
-                    screen_size = fid.read().split()
-                wrap = int(screen_size[1]) - (self.prefix_length() + 1)
+                wrap = self.get_wrap_length()
 
             lines = textwrap.wrap(
                 text, wrap, break_on_hyphens=False
@@ -326,6 +332,12 @@ class Chronometer(object):
             
         warnings.showwarning = self.custom_warning
         return self
+
+    def get_wrap_length(self):
+        with os.popen('stty size', 'r') as fid:
+            screen_size = fid.read().split()
+        wrap_length = int(screen_size[1]) - (self.prefix_length() + 1)
+        return wrap_length
 
     def resumee(self, usermessage=None):
         """Show an overview and clean up."""
