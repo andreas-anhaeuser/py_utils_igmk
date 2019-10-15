@@ -109,6 +109,30 @@ class Colors(unittest.TestCase):
             self.sleep()
         chrono.resumee()
 
+class Wrap(unittest.TestCase):
+    def setUp(self):
+        self.N = 300
+        self.sleep_time = 0.005
+        self.chrono = Chronometer(self.N)
+
+    def sleep(self):
+        sleep(self.sleep_time)
+
+    def test_wrap(self):
+        chrono = self.chrono
+        chrono.header = 'Text wrapping'
+        for i in range(self.N):
+            if i % 100 == 0:
+                print(
+                        'Long string'
+                        + '(should be wrapped according to screen width): '
+                        + ('*' * 10 + ' ') * 25
+                        )
+            chrono.loop_and_show()
+            self.sleep()
+        chrono.resumee()
+
+
 
 if __name__ == '__main__':
     unittest.main()
