@@ -48,7 +48,7 @@ class Timer(object):
         >>> sleep(0.5)
         >>> print(timer)
     """
-    def __init__(self):
+    def __init__(self, name=None):
         """Return self.
             
             A Timer has two states:
@@ -69,6 +69,7 @@ class Timer(object):
         self.elapsed = dt.timedelta()
         self.first_started = dt.datetime.now()
         self.last_started = None
+        self.name = name
 
     def __str__(self):
         """Return elapsed time as human readable string."""
@@ -82,7 +83,12 @@ class Timer(object):
             state = 'running'
         else:
             state = 'stopped'
-        return '%s Timer at %f seconds' % (state, elapsed)
+
+        if self.name is None:
+            name_str = ''
+        else:
+            name_str = ' "%s"' % self.name
+        return '%s Timer at %f seconds' % (state, name_str, elapsed)
 
     def reset(self):
         """Return a timer with zero elapsed time."""
@@ -173,9 +179,16 @@ class Timer(object):
         """Return a datetime.datetime."""
         return self.first_started
 
-    def show(self):
+    def show(self, verbose=True):
         """Print elapsed time and return self."""
-        print(self.get())
+        if verbose:
+            if self.name is None:
+                name_str = ''
+            else:
+                name_str = ' [%s]' % self.name
+            print(str(self.get()) + name_str)
+        else:
+            print(self.get())
         return self
 
     def set(self, elapsed):
@@ -209,7 +222,7 @@ class AlreadyStoppedError(TimerError):
 # testing                                                      #
 ################################################################
 if __name__ == '__main__':
-    timer = Timer()
+    timer = Timer('timername')
     timer.start().show()
     timer.set(2).show()
     timer.stop().show().reset().show()
