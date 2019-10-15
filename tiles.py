@@ -54,6 +54,14 @@ class Tile(object):
         idx_x = slice(self.xmin, self.xmax)
         return (idx_y, idx_x)
 
+def get_tile_numbers(edge_size_y, edge_size_x, total_tile_number):
+    total_area = edge_size_y * edge_size_x
+    area_per_tile = total_area / total_tile_number
+    edge_size_per_tile = np.sqrt(area_per_tile)
+    Ntiles_y = np.round(edge_size_y / edge_size_per_tile)
+    Ntiles_x = np.round(total_tile_number / Ntiles_y)
+    return int(Ntiles_y), int(Ntiles_x)
+
 def tile_2d_raster(Ny, Nx, max_pixels_per_tile):
     """Return list of tiles that are not large than `pixels_per_tiles.
     
