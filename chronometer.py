@@ -282,6 +282,7 @@ class Chronometer(object):
         """Print time stamp and message."""
         if 'file' in kwargs:
             _builtin_print(text, *args, **kwargs)
+            return self
 
         warnings.showwarning = _builtin_warning
 
@@ -329,14 +330,12 @@ class Chronometer(object):
             self.Nlines_last_message = 0
             self.show(force=True)
         # --------------------------------------------
-            
         warnings.showwarning = self.custom_warning
         return self
 
     def get_wrap_length(self):
-        with os.popen('stty size', 'r') as fid:
-            screen_size = fid.read().split()
-        wrap_length = int(screen_size[1]) - (self.prefix_length() + 1)
+        screen_width = get_screen_width()
+        wrap_length = screen_width - (self.prefix_length() + 1)
         return wrap_length
 
     def resumee(self, usermessage=None):
@@ -774,3 +773,15 @@ class Chronometer(object):
 class PerformanceInfo(Chronometer):
     """Alias to Chronometer."""
     pass
+
+#################################################################
+# helpers                                                       #
+#################################################################
+def get_screen_width(default=80):
+    with os.popen('stty size', 'r') as fid:
+        screen_size = fid.read().split()
+        if len(screen_size) < 2:
+            screen_width = default
+        else:
+            screen_width = int(screen_size[1])
+    return screen_width
