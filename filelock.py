@@ -13,6 +13,7 @@
 """
 import os
 import time
+from pathlib import Path
  
 class FileLockException(Exception):
     pass
@@ -61,6 +62,9 @@ class FileLock(object):
     def is_locked(self):
         """Return a bool."""
         return os.path.isfile(self.lockfile)
+
+    def touch(self):
+        Path(self.lockfile).touch()
 
     def lock(self):
         """Create lock file or raise exception if it already exists."""
