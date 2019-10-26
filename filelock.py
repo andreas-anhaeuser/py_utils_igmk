@@ -66,15 +66,39 @@ class FileLock(object):
     def touch(self):
         Path(self.lockfile).touch()
 
+    def attempt_to_lock(self):
+        """Try to lock. Return True if successful, False otherwise.
+
+            The method is immune to any OSError raised by trying to lock the
+            file, but not to other exceptions.
+
+            Returns
+            -------
+            success : bool
+                True if:
+                - is already lock by self
+                - has not been locked by other process
+
+                False if:
+                - locked by other process
+                - OSError while trying to lock
+        """
+        if self.is_locked():
+            if self.created_lock:
+                self.touch()
+                return True
+            else:
+                return False
+
+        # If this line is reached, it can be assumed to be unlocked
+        try:
+            self.lock()
+            return True
+        except OSError as exception:
+            return False
+
     def lock(self):
         """Create lock file or raise exception if it already exists."""
-        # make sure it's not already locked by someone else
-        if self.is_locked() and not self.created_lock:
-            raise FileLockException(
-                    'Trying to lock a file that has already been locked'
-                    + ' by another instance: %s' % self.file_name
-                    )
-
         # create directory
         dirname = os.path.dirname(self.lockfile)
         if dirname == '':
@@ -82,6 +106,13 @@ class FileLock(object):
             pass
         elif not os.path.isdir(dirname):
             os.makedirs(dirname)
+
+        # make sure it's not already locked by someone else
+        if self.is_locked() and not self.created_lock:
+            raise FileLockException(
+                    'Trying to lock a file that has already been locked'
+                    + ' by another instance: %s' % self.file_name
+                    )
 
         # create file
         with open(self.lockfile, 'w'):

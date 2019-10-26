@@ -9,9 +9,11 @@ import unittest
 from utils_igmk.filelock import FileLock
 
 class RegularUsage(unittest.TestCase):
-    def test_in_context(self):
+    def setUp(self):
         print('-----')
-        print('Test context management')
+
+    def test_in_context(self):
+        print('Context management')
         filename = 'testfile_to_be_locked.tmp'
         lockfile = 'testfile_to_be_locked.tmp.lock'
         if os.path.isfile(lockfile):
@@ -52,7 +54,7 @@ class RegularUsage(unittest.TestCase):
 
         # check that lock realises the conflict
         with FileLock(filename) as lock:
-            print('something else')
+            print('Some output text inside the FileLock context.')
             self.assertTrue(os.path.isfile(lock.lockfile))
             self.assertTrue(os.path.isfile(lockfile))
             self.assertTrue(lock.is_locked())
