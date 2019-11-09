@@ -83,6 +83,12 @@ class Record(object):
     def count_unique_entries(self):
         raise NotImplementedError()
 
+    def erase(self):
+        """Delete the record file if existant."""
+        if os.path.isfile(self.filename):
+            os.remove(self.filename)
+        return self
+
     def get_unique_entries(self):
         raise NotImplementedError()
 
