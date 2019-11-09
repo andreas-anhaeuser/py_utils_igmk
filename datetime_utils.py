@@ -654,7 +654,7 @@ def add_months(time, number=1):
         ----------
         time : datetime.date
         number : int (pos or neg)
-            the number of months to add (substract if negative)
+            the number of months to add (subtract if negative)
 
         Returns
         -------

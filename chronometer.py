@@ -407,12 +407,14 @@ class Chronometer(object):
     # GETTERS                                         #
     ###################################################
     def get_count(self):
+        """Return current count as int."""
         return self.count
 
     def get_info(self):
         return self.info
 
     def get_total_count(self):
+        """Return total count as int."""
         return self.total_count
 
     ###################################################

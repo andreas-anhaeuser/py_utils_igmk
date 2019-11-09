@@ -176,7 +176,7 @@ class Interval(object):
         return False
 
     def is_addable_to(self, other):
-        """Return True if the interval overlap or touch, False otherwise."""
+        """Return True if the intervals overlap or touch, False otherwise."""
         if not isinstance(other, Interval):
             raise TypeError('other must be Interval.')
         if self.overlaps(other):
@@ -187,7 +187,8 @@ class Interval(object):
             return True
         return False
 
-    def is_substractable(self, other):
+    def is_subtractable(self, other):
+        """Return True if the intervals are subtractable, False, otherwise."""
         if self._overhangs_left(other):
             return True
         if other._overhangs_left(self):
@@ -202,9 +203,8 @@ class Interval(object):
         if not isinstance(other, Interval):
             raise TypeError('other must be Interval.')
         if not self.overlaps(other):
-            raise ValueError(
-                    'Intervals do not overlap: %s, %s' % (self, other)
-                    )
+            message = 'Intervals do not overlap: %s, %s' % (self, other)
+            raise ValueError(message)
 
         # start
         if self.start == other.start:
@@ -267,7 +267,7 @@ class Interval(object):
                 start_inclusive=start_inclusive, end_inclusive=end_inclusive,
                 )
 
-    def substract(self, other):
+    def subtract(self, other):
         """Return the difference interval."""
         if not isinstance(other, Interval):
             raise TypeError('other must be Interval.')
@@ -277,7 +277,7 @@ class Interval(object):
                 )
 
         if other._overhangs_left(self):
-            return other.substract(self)
+            return other.subtract(self)
 
         if not self._overhangs_left(other):
             raise ValueError('Result would not be and Interval.') 
