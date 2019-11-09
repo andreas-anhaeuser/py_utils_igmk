@@ -17,6 +17,9 @@ from pathlib import Path
  
 class FileLockException(Exception):
     pass
+
+class FileAlreadyLockedException(FileLockException, OSError):
+    pass
  
 class FileLock(object):
     """A file lock for use in a `with` context."""
@@ -109,7 +112,7 @@ class FileLock(object):
 
         # make sure it's not already locked by someone else
         if self.is_locked() and not self.created_lock:
-            raise FileLockException(
+            raise FileAlreadyLockedException(
                     'Trying to lock a file that has already been locked'
                     + ' by another instance: %s' % self.file_name
                     )
