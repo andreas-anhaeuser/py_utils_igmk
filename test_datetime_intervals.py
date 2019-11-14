@@ -4,8 +4,8 @@
 import datetime as dt
 import unittest
 
-import lib.pub.utils_igmk.datetime_utils as du
-from lib.pub.utils_igmk.datetime_utils import Interval, DaytimePeriod, Season
+import utils_igmk.datetime_utils as du
+from utils_igmk.datetime_utils import Interval, DaytimePeriod, Season
 
 class Comparisons(unittest.TestCase):
     def setUp(self):

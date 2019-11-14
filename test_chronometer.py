@@ -4,7 +4,7 @@
 import unittest
 from time import sleep
 
-from lib.pub.utils_igmk.chronometer import Chronometer
+from utils_igmk.chronometer import Chronometer
 
 ###################################################
 # TESTING                                         #

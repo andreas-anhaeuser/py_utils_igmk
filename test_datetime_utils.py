@@ -4,8 +4,8 @@
 import datetime as dt
 import unittest
 
-import lib.pub.utils_igmk.datetime_utils as du
-from lib.pub.utils_igmk.datetime_utils import Interval, DaytimePeriod, Season
+import utils_igmk.datetime_utils as du
+from utils_igmk.datetime_utils import Interval, DaytimePeriod, Season
 
 class MonthsInInterval(unittest.TestCase):
     def test_months_in_interval(self):
@@ -34,4 +34,3 @@ class MonthsInInterval(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
