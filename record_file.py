@@ -458,7 +458,7 @@ def test_write_and_look_up():
 
 def test_class_basic():
     import datetime as dt
-    filename = '.tempdir/.record_file.tmp.txt'
+    filename = '.record_file.tmp.txt'
     entries = ['first', 2, dt.datetime.now(), ('a', 'tuple')]
     record = Record(filename)
 
@@ -484,7 +484,7 @@ def test_class_basic():
         found = record.contains(entry)
         print('Entry %s in record file: %s' % (entry, found))
 
-    os.remove(filename)
+    record.erase()
 
 
 if __name__ == '__main__':
