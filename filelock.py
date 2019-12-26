@@ -42,6 +42,8 @@ class FileLock(object):
  
     def __del__(self):
         """Make sure the lockfile isn't left lying around."""
+        if not hasattr(self, 'created_lock'):
+            return
         if self.created_lock:
             self.release()
 
@@ -135,7 +137,14 @@ class FileLock(object):
                     + ' by another instance:' % self.lockfile
                     )
 
-        os.remove(self.lockfile)
+        if os.path.isfile(self.lockfile):
+            try:
+                os.remove(self.lockfile)
+            except FileNotFoundError:
+                # This happens if file is removed by other process between
+                # check and deletion.
+                pass
+
         self.created_lock = False
 
         return self
