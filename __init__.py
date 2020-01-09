@@ -6,7 +6,7 @@ from . import datetime_utils
 from . import filelock
 from . import fluids
 from . import geometry
-# from . import geodata
+from . import geodata
 from . import humidity
 from . import iso
 from . import math
@@ -19,6 +19,7 @@ from . import string_utils
 from . import sun
 from . import tables
 from . import timer
+from . import translation
+from . import units
 
 from .nelder_mead import nelder_mead
-

@@ -3,16 +3,26 @@
 # standard modules
 from pyproj import Proj
 
+# local modules
+from utils_igmk import units as unit_utils
+
 def lonlat_to_utm(lon, lat, crs=None, units='m'):
     """Return x, y."""
     if crs is None:
         crs = get_utm_proj4string(lon, lat, units)
-    proj = Proj(crs)
+
+    # create projection
+    if isinstance(crs, Proj):
+        proj = crs
+    else:
+        proj = Proj(crs)
+
+    # apply projection
     x, y = proj(lon, lat)
 
     # scale
     units = retrieve_units_from_crs(crs)
-    scale_factor = get_scale_factor(units)
+    scale_factor = unit_utils.get_scale_factor(units)
     x_out = x / scale_factor
     y_out = y / scale_factor
 
@@ -24,16 +34,48 @@ def utm_to_lonlat(x, y, crs):
 
     # scale to SI base units
     units = retrieve_units_from_crs(crs)
-    scale_factor = get_scale_factor(units)
+    scale_factor = unit_utils.get_scale_factor(units)
     x_si = x * scale_factor
     y_si = y * scale_factor
 
     return proj(x_si, y_si, inverse=True)
 
-def get_utm_crf(lon, lat, units='m'):
-    """Return a CRF."""
+def get_utm_projection(lon, lat, units='m'):
     proj4string = get_utm_proj4string(lon, lat, units)
+    return Proj(proj4string)
 
+def get_utm_proj4string(lon, lat, units='m'):
+    """Return a proj4sring."""
+    zone, hem = get_utm_zone(lon, lat)
+    return utm_proj4string_from_zone(zone, hem, units)
+
+def utm_proj4string_from_zone(zone, hem, units='m'):
+    """Return a proj4sring.
+
+        Parameters
+        ----------
+        zone : int
+        hem : 'N' or 'S'
+
+        Returns
+        -------
+        proj4string : str
+    """
+    if hem.lower() in ('s', 'south'):
+        hem_long = 'south'
+    elif hem.lower() in ('n', 'north'):
+        hem_long = 'north'
+    else:
+        raise ValueError('Unkown UTM hemisphere: %s' % hem)
+
+    fmt = '+proj=utm +datum=WGS84 +no_defs +zone=%s +%s +units=%s'
+    proj4string = fmt % (str(zone), hem_long, units)
+    return proj4string
+
+
+################################################################
+# helpers                                                      #
+################################################################
 def get_utm_zone(lon, lat):
     """Return UTM zone as int an and str.
 
@@ -74,40 +116,6 @@ def get_utm_zone(lon, lat):
 
     return zone, hem
 
-def get_utm_crs(*args, **kwargs):
-    return get_utm_proj4string(*args, **kwargs)
-
-def get_utm_proj4string(lon, lat, units='m'):
-    """Return a proj4sring."""
-    zone, hem = get_utm_zone(lon, lat)
-    return utm_proj4string_from_zone(zone, hem, units)
-
-def utm_proj4string_from_zone(zone, hem, units='m')
-    """Return a proj4sring.
-
-        Parameters
-        ----------
-        zone : int
-        hem : 'N' or 'S'
-
-        Returns
-        -------
-        proj4string : str
-    """
-    if hem.lower() in ('s', 'south'):
-        hem_long = 'south'
-    elif hem.lower() in ('n', 'north'):
-        hem_long = 'north'
-    else:
-        raise ValueError('Unkown UTM hemisphere: %s' % hem)
-
-    fmt = '+proj=utm +datum=WGS84 +no_defs +zone=%s +%s +units=%s'
-    proj4string = fmt % (str(zone), hem_long, units)
-    return proj4string
-
-################################################################
-# helpers                                                      #
-################################################################
 def retrieve_units_from_crs(s):
     """Return a str."""
     pattern = 'units='
@@ -119,12 +127,3 @@ def retrieve_units_from_crs(s):
     words = s[ibeg:].split()
     units = words[0]
     return units
-
-def get_scale_factor(units):
-    if units == 'm':
-        return 1.
-
-    if units == 'km':
-        return 1000.
-
-    raise ValueError('Unknown units: %s' % units)
