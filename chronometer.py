@@ -460,6 +460,7 @@ class Chronometer(object):
         if not isinstance(info, str):
             raise TypeError('info must be str.')
         self.info = str(info)
+        return self
 
     def set_header(self, header):
         self.header = str(header)
