@@ -25,6 +25,19 @@ def gdf_to_grid(
         remapped : nd-array, same size as `target_x`
             remapped data
     """
+    ############################################################
+    # input check                                              #
+    ############################################################
+    shape_x = np.shape(target_x)
+    shape_y = np.shape(target_y)
+    if shape_x != shape_y:
+        i_need = "target coords must have same shape"
+        this_is = "got %s and %s" % (shape_x, shape_y)
+        raise ValueError(i_need + ', but ' + this_is)
+
+    ############################################################
+    # main                                                     #
+    ############################################################
     # source values
     source_values = np.array(gdf[value_name])
 
@@ -43,6 +56,11 @@ def gdf_to_grid(
         target_xy,
         method=method,
         fill_value=fill_value,
-        )
+        ).T
+
+    ############################################################
+    # output check                                             #
+    ############################################################
+    assert np.shape(remapped) == shape_x
 
     return remapped
