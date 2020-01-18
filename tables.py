@@ -586,10 +586,7 @@ def column_list(
     ###################################################
     line = ''
     for j in range(J):
-        if j == 0:
-            word = comment_str + headers[j]
-        else:
-            word = headers[j]
+        word = headers[j]
 
         if j < J - 1:
             word = word + sep
