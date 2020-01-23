@@ -1,4 +1,3 @@
-#!/usr/bin/python
 """String table utilities.
 
     Author
@@ -19,6 +18,9 @@ import warnings
 
 # PyPI modules
 import numpy as np
+
+# utils_igmk
+from utils_igmk.string_converters import string_to_number
 
 _str_delims = ('"', "'")
 
@@ -695,6 +697,8 @@ def get_column_list(*args, **kwargs):
 def read_column_list(
         filename, sep=None, skip_rows=0, comment_str='#',
         skip_invalid_rows=False, set_to_lowercase=False,
+        missing_str='nan', nan_str=None,
+        convert_to_number=False,
         ):
     """Read text file structured in columns and return as list of lists.
     
@@ -730,6 +734,9 @@ def read_column_list(
 
     if comment_str is None:
         comment_str = ''
+
+    if (missing_str is None) and (nan_str is not None):
+        missing_str = nan_str
 
     ###################################################
     # READ FILE                                       #
@@ -798,11 +805,27 @@ def read_column_list(
                 )
         warnings.warn(message)
 
+    ############################################################
+    # convert to numbers                                       #
+    ############################################################
+    N = len(cols)
+    for n in range(N):
+        if not convert_to_number:
+            break
+
+        # try to convert to floats
+        try:
+            values = string_to_number(cols[n], missing_str=missing_str)
+            cols[n] = values
+        except ValueError as e:
+            # not a purely numeric column
+            pass
+
     return cols
 
 def read_column_list_with_headers(
         filename, sep=None, comment_str='#', convert_to_number=False,
-        nan_str='nan', skip_invalid_rows=False, **kwargs
+        missing_str='nan', nan_str=None, skip_invalid_rows=False, **kwargs
         ):
     """Read text file structured in columns and return as dict.
 
@@ -837,7 +860,8 @@ def read_column_list_with_headers(
         -------
         Make sure the header row does not contain `comment_str`.
     """
-    dtype = float
+    if (missing_str is None) and (nan_str is not None):
+        missing_str = nan_str
 
     cols = read_column_list(
             filename, sep=sep, comment_str=comment_str,
@@ -853,18 +877,10 @@ def read_column_list_with_headers(
         header = rows[0]
         values = rows[1:]
 
+        # convert to float
         if convert_to_number:
-            # `nan_str` --> 'nan'
-            vals_tmp = copy(values)
-            for nval, val in enumerate(vals_tmp):
-                if val == nan_str:
-                    vals_tmp[nval] = 'nan'
-                elif val == '':
-                    vals_tmp[nval] = 'nan'
-
-            # try to convert to floats
             try:
-                values = np.array(vals_tmp, dtype=dtype)
+                values = string_to_number(values, missing_str=missing_str)
             except ValueError as e:
                 # not a purely numeric column
                 pass
@@ -872,21 +888,3 @@ def read_column_list_with_headers(
         data[header] = values
 
     return data
-
-###################################################
-# TESTS                                           #
-###################################################
-def get_column_list_with_headers___test_number_convertion():
-    filename = 'tables__test_file_column_list.txt'
-    sep = '|'
-    convert_to_number = True
-
-    data = read_column_list_with_headers(
-            filename, sep=sep, convert_to_number=convert_to_number)
-
-    for key in sorted(data):
-        print('%s: %s' % (key.ljust(32), str(data[key])))
-
-
-if __name__ == '__main__':
-    get_column_list_with_headers___test_number_convertion()

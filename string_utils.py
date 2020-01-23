@@ -1,16 +1,13 @@
 #!/usr/bin/python
-"""Functions for strings.
+"""String utils.
 
     Author
     ------
     Andreas Anhaeuser (AA) <andreas.anhaeuser@posteo.net>
-    Institute for Geophysics and Meteorology
-    University of Cologne, Germany
 """
 
 # standard modules
 import sys
-from copy import deepcopy as copy
 
 # PyPI modules
 import numpy as np
@@ -319,6 +316,10 @@ def progress_bar(
         use_color=True,
         ):
     """Return a nice progress bar as str."""
+    # input check
+    if not np.isfinite(fraction):
+        raise ValueError('Need finite value, got %s' % fraction)
+
     if use_color:
         endcolor = _ENDC
     else:
