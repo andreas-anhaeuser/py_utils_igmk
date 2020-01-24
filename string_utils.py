@@ -315,10 +315,35 @@ def progress_bar(
         fraction, length=79, fillcolor='', bgcolor='', delim_color=_BOLD,
         use_color=True,
         ):
-    """Return a nice progress bar as str."""
+    """Return a nice progress bar as str.
+
+        Parameters
+        ----------
+        fraction : float
+            fraction of bar to be filled, function optimized for
+            0 <= fraction <= 1, but works with other values, too.
+            Must be finite.
+        length : int > 2
+            full length of the progress bar including bounds
+        fillcolor : str, optional
+        bgcolor : str, optional
+        delim_color : str, optional
+        use_color : bool, optional
+
+        Returns
+        -------
+        str
+    """
     # input check
+    # ===========================================================
     if not np.isfinite(fraction):
         raise ValueError('Need finite value, got %s' % fraction)
+
+    if not isinstance(length, int):
+        raise TypeError('length must be int, got %s' % type(length))
+    if length < 3:
+        raise ValueError('length must be larger than 2, got %s' % length)
+    # ===========================================================
 
     if use_color:
         endcolor = _ENDC
@@ -366,6 +391,15 @@ def progress_bar_inner(
         fraction, length=77, fillcolor='', bgcolor='', use_color=True,
         ):
     """*Helper function."""
+    # input check
+    # =========================================================
+    if not isinstance(length, int):
+        raise TypeError('length must be int, got %s' % type(length))
+    if length < 1:
+        raise ValueError('length must be positive, got %s' % length)
+    # =========================================================
+
+
     # N : integers
     # F : float
     # full : number of (entirely) filled columns
