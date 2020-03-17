@@ -12,7 +12,7 @@ import collections
 import numpy as np
 
 def string_to_number(s, dtype=float, missing_str='nan', missing_value=np.nan):
-    """
+    """Convert a str to number.
 
         Parameters
         ----------
