@@ -53,11 +53,41 @@ def si_to_dobson_unit(value, substance):
     N_molec = value / m             # (m-2) molecules per surface area
     return N_molec / _dobson_unit
 
+def dobson_unit_factor(substance):
+    """Return ratio of DU/SI numeric values."""
+    m = molecular_mass(substance)
+    return 1 / (m * _dobson_unit)
+
+def ppb_factor(substance, p=None, T=None):
+    M = molecular_mass(substance)
+    mass_to_volume = 1. / volume_to_mass_density(1, M, p, T)
+    mass_to_ppb = 1e9 * mass_to_volume
+    return mass_to_ppb
+
 def molecular_mass(substance):
-    if substance.lower() == 'no2':
-        M = 46.006e-3
-    elif substance.lower() == 'so2':
-        M = 64.066e-3
-    else:
-        raise NotImplementedError()
-    return M / _avogadro_constant
+    """Return molecular mass in kg."""
+    name_short = get_chemical_formula(substance).lower()
+    masses_mol = {
+            'co'  : 28.010e-3,
+            'no2' : 46.006e-3,
+            'so2' : 64.066e-3,
+            }
+
+    if name_short not in masses_mol:
+        raise NotImplementedError(
+                'Substance not implemented: %s (%s)'
+                % (substance, name_short)
+                )
+
+    return masses_mol[name_short] / _avogadro_constant
+
+def get_chemical_formula(substance):
+    aliases = {
+            'carbonmonoxide' : 'CO',
+            'nitrogendioxide' : 'NO2',
+            'sulfurdioxide' : 'SO2',
+            }
+    substance_lower = substance.lower()
+    if substance_lower in aliases:
+        return aliases[substance_lower]
+    return substance
