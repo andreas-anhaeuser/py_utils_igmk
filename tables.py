@@ -12,7 +12,7 @@
 
 # standard modules
 import os
-import collections
+from collections import Iterable
 from copy import deepcopy as copy
 import warnings
 
@@ -154,7 +154,7 @@ def read_vartable(filename, sep='|', comment='#', ignore_str=' '):
 
     return table
 
-def read_namelist(filename, *args, **kwargs):
+def read_namelist(filename, *args, recursive=True, **kwargs):
     """Read namelist (setup) text file and return as a dict.
 
         Parameters
@@ -217,7 +217,59 @@ def read_namelist(filename, *args, **kwargs):
     with open(filename, 'r') as fid:
         lines = fid.readlines()
 
-    return get_namelist(lines, *args, **kwargs)
+    namelist = get_namelist(lines, *args, **kwargs)
+
+    ############################################################
+    # recurse                                                  #
+    ############################################################
+    recurse_keys = ('load_file', 'load_files', 'read_file', 'read_files')
+    namelist['loaded_files'] = [filename]
+    for recurse_key in recurse_keys:
+        if not recursive:
+            break
+
+        if recurse_key not in namelist:
+            continue
+
+        # retrieve filename to recurse
+        # --------------------------------------------
+        filenames_parent = namelist[recurse_key]
+        del namelist[recurse_key]
+
+        if not isinstance(filenames_parent, Iterable):
+            filenames_parent = str(filenames_parent)
+
+        if isinstance(filenames_parent, str):
+            filenames_parent = [filenames_parent]
+        # --------------------------------------------
+
+        for filename_parent in filenames_parent[::-1]:
+            filename_rel = get_path_relative_to(filename_parent, filename)
+
+            # load
+            namelist_parent = read_namelist(filename_rel, *args, **kwargs)
+
+            # track what has been loaded
+            lf_key = 'loaded_files'
+            namelist[lf_key] = namelist_parent[lf_key] + namelist[lf_key]
+
+            namelist_parent.update(namelist)
+            namelist = namelist_parent
+
+    return namelist
+
+def get_path_relative_to(filename, pivot):
+    filename = os.path.expanduser(filename)
+
+    if filename.startswith('/'):
+        # an absolute path
+        return filename
+
+    dirname_pivot = os.path.dirname(pivot)
+    if dirname_pivot == '':
+        dirname_pivot = '.'
+    filename_rel = dirname_pivot + '/' + filename
+    return filename_rel
 
 def read_structured_namelist(filename, *args, **kwargs):
     """Read structured namelist (setup) text file and return as a dict."""
@@ -397,28 +449,28 @@ def get_namelist(
             multiple_appearance = data
             continue
 
-        ###################################################
-        # LOAD SUB-FILE                                   #
-        ###################################################
-        if name in ('load_file', 'load_files'):
-            if not isinstance(data, list):
-                data = [data]
-            for filename in data:
-                sub_namelist = read_namelist(
-                        filename,
-                        name_end=name_end,
-                        sep=sep,
-                        comment=comment,
-                        ignore_char=ignore_char,
-                        convert_to_number=convert_to_number,
-                        conversion_error=conversion_error,
-                        str_delims=str_delims,
-                        strip_string_delimiters=strip_string_delimiters,
-                        )
-                for key in sub_namelist:
-                    namelist[key] = sub_namelist[key]
-                del sub_namelist
-            continue
+#        ###################################################
+#        # LOAD SUB-FILE                                   #
+#        ###################################################
+#        if name in ('load_file', 'load_files'):
+#            if not isinstance(data, list):
+#                data = [data]
+#            for filename in data:
+#                sub_namelist = read_namelist(
+#                        filename,
+#                        name_end=name_end,
+#                        sep=sep,
+#                        comment=comment,
+#                        ignore_char=ignore_char,
+#                        convert_to_number=convert_to_number,
+#                        conversion_error=conversion_error,
+#                        str_delims=str_delims,
+#                        strip_string_delimiters=strip_string_delimiters,
+#                        )
+#                for key in sub_namelist:
+#                    namelist[key] = sub_namelist[key]
+#                del sub_namelist
+#            continue
 
         ###################################################
         # FLOAT CONVERSION                                #
@@ -468,7 +520,7 @@ def str2num(s, str_delims=_str_delims):
     """Convert to number if it does not contain ' or " ."""
     # list case
     if not isinstance(s, str):
-        if isinstance(s, collections.Iterable):
+        if isinstance(s, Iterable):
             return [str2num(el) for el in s]
 
     # check whether s is bounded with ' or "
@@ -487,7 +539,7 @@ def str2num(s, str_delims=_str_delims):
     return number
 
 def column_list(
-        headers, data, typ='s', align='l', column_width=16, precision=7,
+        headers, data, typ='s', align='l', column_width=None, precision=7,
         filename=None, comment_top=None, comment_bottom=None, sep=' ',
         comment_str='# ',
         ):
@@ -527,7 +579,7 @@ def column_list(
     # ========== helper functions  ======================= #
     def expand(x, J):
         """Expand variable to length J if it is singleton."""
-        if isinstance(x, collections.Iterable):
+        if isinstance(x, Iterable):
             if len(x) == 1:
                 return x * J
             elif len(x) == J:
@@ -547,15 +599,15 @@ def column_list(
 
     # ========== perform checks  ========================= #
     # headers
-    assert isinstance(headers, collections.Iterable)
+    assert isinstance(headers, Iterable)
     J = len(headers)
 
     # data
-    assert isinstance(data, collections.Iterable)
+    assert isinstance(data, Iterable)
     assert len(data) == J
     init = False
     for x in data:
-        assert isinstance(x, collections.Iterable)
+        assert isinstance(x, Iterable)
         if not init:
             N = len(x)
             init = True
@@ -564,6 +616,9 @@ def column_list(
     # length J variables
     typ = expand(typ, J)
     align = expand(align, J)
+    if column_width is None:
+        column_width = determine_column_width(headers, data)
+
     column_width = expand(column_width, J)
     precision = expand(precision, J)
 
@@ -888,3 +943,23 @@ def read_column_list_with_headers(
         data[header] = values
 
     return data
+
+################################################################
+# helpers                                                      #
+################################################################
+def determine_column_width(headers, data):
+    N = len(headers)
+    assert len(data) == N
+    column_widths = [None] * N
+
+    for n, header in enumerate(headers):
+        cw = len(header)
+        for value in data[n]:
+            if not isinstance(value, str):
+                continue
+            width = len(value)
+            cw = max(cw, width)
+
+        column_widths[n] = cw + 2
+
+    return column_widths
