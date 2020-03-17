@@ -30,9 +30,9 @@ from netCDF4 import Dataset
 # local modules
 from . import string_utils as aa_str
 
-#################################################
-# FUNCTIONS USING VARTABLES                     #
-#################################################
+################################################################
+# main                                                         #
+################################################################
 def read_file(
         filename, varnames=None, ignore_varnames=[], str_method='regular',
         ):
@@ -466,6 +466,119 @@ def write_file(
             setattr(nc, gatt, meta['glob'][gatt])
 
     nc.close()
+
+def select_variables(file_in, file_out, varnames):
+    """Create a copy with only selected variables.
+
+        Parameters
+        ----------
+        file_in : str or netCDF4.Dataset
+            name of input file or an opened netCDF4.Dataset of such
+        file_out : str or netCDF4.Dataset
+            name of ouput file or an opened netCDF4.Dataset of such
+        varname : list of str
+            variables to be copied
+
+        Returns
+        -------
+        None
+    """
+    # Open file_in
+    # ------------------------------------------------------
+    if not isinstance(file_in, Dataset):
+        # check type
+        if not isinstance(file_in, str):
+            message = (
+                'file_in must be a filename or netCDF4.Dataset'
+                + ', got %s' % file_in
+                )
+            raise TypeError(message)
+
+        # check if file exists
+        if not os.path.isfile(file_in):
+            raise OSError('Input file does not exist: %s' % file_in)
+
+        # call function recursively
+        with Dataset(file_in, 'r') as fi:
+            return select_variables(fi, file_out, varnames)
+
+    # If this line is reached, file_in is a Dataset
+    fi = file_in
+    # ------------------------------------------------------
+
+    # Open file_out
+    # ------------------------------------------------------
+    if not isinstance(file_out, Dataset):
+        # check type
+        if not isinstance(file_out, str):
+            message = (
+                'file_out must be a filename or netCDF4.Dataset'
+                + ', got %s' % file_out
+                )
+            raise TypeError(message)
+
+        # build directory
+        dirname = os.path.dirname(file_out)
+        if not os.path.isdir(dirname):
+            os.makedirs(dirname)
+
+        # call function recursively
+        data_model = fi.data_model
+        with Dataset(file_out, 'w', format=data_model) as fo:
+            return select_variables(fi, fo, varnames)
+
+    # If this line is reached, file_out is a Dataset
+    fo = file_out
+    # ------------------------------------------------------
+
+    # global attributes
+    # ------------------------------------------------------
+    attributes = fi.ncattrs()
+    for attribute in attributes:
+        value = fi.getncattr(attribute)
+        fo.setncattr(attribute, value)
+    # ------------------------------------------------------
+
+    for varname in varnames:
+        if varname not in fi.variables:
+            continue
+
+        vi = fi.variables[varname]
+        dimensions = vi.dimensions
+        dtype= vi.dtype
+        attributes = vi.ncattrs()
+
+        # create dimensions
+        # ------------------------------------------------------
+        for dimension in dimensions:
+            if dimension in fo.dimensions:
+                continue
+
+            size = fi.dimensions[dimension].size
+            fo.createDimension(dimension, size)
+        # ------------------------------------------------------
+
+        # create variable
+        # ------------------------------------------------------
+        vo = fo.createVariable(varname, dtype, dimensions)
+        # ------------------------------------------------------
+
+        # create attributes
+        # ------------------------------------------------------
+        for attribute in attributes:
+            value = vi.getncattr(attribute)
+            vo.setncattr(attribute, value)
+        # ------------------------------------------------------
+
+        # copy data
+        # ------------------------------------------------------
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', RuntimeWarning)
+            vo[:] = vi[:]
+        # ------------------------------------------------------
+
+    return None
+
 
 #################################################
 # HELPER FUNCTIONS                              #
