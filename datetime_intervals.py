@@ -24,7 +24,8 @@ class Interval(object):
                 Default: False
 
             `start` must not be larger than `end`.
-            if `start` == `end`, the interval cannot be left-open and right-closed.
+            if `start` == `end`, the interval cannot be left-open and
+            right-closed.
         """
         # input check
         if not isinstance(start, dt.datetime):

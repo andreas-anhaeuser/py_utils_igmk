@@ -12,14 +12,15 @@
 
 # standard modules
 import calendar
-import collections
 import datetime as dt
+from collections import Iterable
 
 # PyPI modules
 import numpy as np
 
 # internal modules
 from .datetime_intervals import Interval, DaytimePeriod, Season
+from .timedelta import MonthTimeDelta, YearTimeDelta
 
 ###################################################
 # range                                           #
@@ -80,7 +81,9 @@ def date_range(beg, end, inc=None, season_of_year=None):
     # convert to datetime.date objects
     return [t.date() for t in dtrange]
 
-def datetime_range(beg, end, inc, season_of_year=None, daytime_period=None):
+def datetime_range(
+        beg, end, inc=None, season_of_year=None, daytime_period=None,
+        ):
     """Return a list of dt.datetime. Works in analogy to range().
 
         The function works similar to the standard range() function and is
@@ -95,7 +98,8 @@ def datetime_range(beg, end, inc, season_of_year=None, daytime_period=None):
             inclusive
         end : dt.datetime
             exclusive
-        inc : dt.timedelta
+        inc : dt.timedelta, optional
+            Default: one day
         season_of_year : Season, optional
             Default: whole year
         daytime_period : DaytimePeriod, optional
@@ -109,12 +113,17 @@ def datetime_range(beg, end, inc, season_of_year=None, daytime_period=None):
         -------
         2014       (AA): Created
         2017-12-30 (AA): Extention for inc < 0. Raise error on inc == 0.
+        2020-02-28 (AA): Set default for `inc` (1 day)
     """
     ###################################################
     # DEFAULT                                         #
     ###################################################
+    if inc is None:
+        inc = dt.timedelta(1)
+
     if season_of_year is None:
         season_of_year = Season(dt.datetime(1, 1, 1), dt.datetime(1, 1, 1))
+
     if daytime_period is None:
         daytime_period = DaytimePeriod(dt.time(), dt.time())
 
@@ -143,6 +152,34 @@ def datetime_range(beg, end, inc, season_of_year=None, daytime_period=None):
     ###################################################
     season = season_of_year
     timeperiod = daytime_period
+
+    ############################################################
+    # MonthTimeDelta                                           #
+    ############################################################
+    if isinstance(inc, MonthTimeDelta):
+        times_raw = month_range(beg, end, inc.number)
+        times = []
+        for time in times_raw:
+            if time not in season:
+                continue
+            if time not in timeperiod:
+                continue
+            times.append(time)
+        return times
+
+    ############################################################
+    # YearTimeDelta                                            #
+    ############################################################
+    if isinstance(inc, YearTimeDelta):
+        times_raw = year_range(beg, end, inc.number)
+        times = []
+        for time in times_raw:
+            if time not in season:
+                continue
+            if time not in timeperiod:
+                continue
+            times.append(time)
+        return times
 
     ###################################################
     # BUILD LIST                                      #
@@ -306,7 +343,7 @@ def datetime_to_seconds(d, reference_date=dt.datetime(1970, 1, 1)):
         d = dt.datetime(d.year, d.month, d.day)
 
     # recursively call function:
-    if isinstance(d, collections.Iterable):
+    if isinstance(d, Iterable):
         if len(d) == 0:
             return []
         else:
@@ -355,7 +392,7 @@ def seconds_to_datetime(seconds, reference_date=dt.datetime(1970, 1, 1)):
     if ref.__class__ == dt.date:
         ref = dt.datetime(ref.year, ref.month, ref.day)
 
-    if isinstance(seconds, collections.Iterable):
+    if isinstance(seconds, Iterable):
         return [seconds_to_datetime(s, ref) for s in seconds]
 
     if np.isnan(seconds):
@@ -382,7 +419,7 @@ def julian_days_to_datetime(days):
         ------
         Moderately. Seems to be working but no guarantee.
     """
-    if isinstance(days, collections.Iterable):
+    if isinstance(days, Iterable):
         return([julian_days_to_datetime(d) for d in days])
     JD0 = 1721425.5  # Julian date of 1st Jan 1, 00:00
     return dt.datetime(1, 1, 1) + dt.timedelta(days=days - JD0)
@@ -398,7 +435,7 @@ def datetime_to_julian_days(time):
         -------
         float or array of such
     """
-    if isinstance(time, collections.Iterable):
+    if isinstance(time, Iterable):
         return np.array([datetime_to_julian_days(t) for t in time])
     JD0 = 1721425.5  # Julian date of 1st Jan 1, 00:00
     diff = (time - dt.datetime(1, 1, 1))
@@ -437,7 +474,7 @@ def doy(date):
     ###################################################
     # RECURSIVE FUNCTION CALL FOR LISTS               #
     ###################################################
-    if isinstance(date, collections.Iterable):
+    if isinstance(date, Iterable):
         S = np.shape(date)
         assert len(S) == 1
         N = S[0]
@@ -554,7 +591,7 @@ def sod_doy(time):
     ###################################################
     # RECURSIVE FUNCTION CALL FOR LISTS               #
     ###################################################
-    if isinstance(time, collections.Iterable):
+    if isinstance(time, Iterable):
         S = np.shape(time)
         assert len(S) == 1
         N = S[0]
@@ -774,6 +811,58 @@ def floor(time, comp='day', step=1):
 
     return time.replace(**kwargs)
 
+def str_to_timedelta(words, enhanced=False):
+    if isinstance(words, str):
+        words = words.strip().replace('_', ' ').split()
+    
+    if len(words) == 1:
+        number = words[0]
+        unit = 'd'
+        string = number + ' ' + unit
+        return str_to_timedelta(string)
+
+    if len(words) != 2:
+        message = "Don't know how to interpret this as timedelta: %s" % string
+        raise ValueError(message)
+
+    try:
+        number = int(words[0])
+    except ValueError:
+        raise ValueError('Need int in first place, got %s' % number)
+
+    unit = words[1]
+
+    aliases = {
+            'us' : 'microseconds',
+            'microsecond' : 'microseconds',
+            's' : 'seconds',
+            'sec' : 'seconds',
+            'secs' : 'seconds',
+            'min' : 'minutes',
+            'mins' : 'minutes',
+            'minute' : 'minutes',
+            'h' : 'hours',
+            'hour' : 'hours',
+            'd' : 'days',
+            'day' : 'days',
+            'mon' : 'months',
+            'month' : 'months',
+            'a' : 'years',
+            'year' : 'years',
+            'yr' : 'years',
+            'yrs' : 'years',
+            }
+
+    if unit in aliases:
+        unit = aliases[unit]
+
+    if enhanced and unit == 'months':
+        return MonthTimeDelta(number)
+
+    if enhanced and unit == 'years':
+        return YearTimeDelta(number)
+
+    return dt.timedelta(**{unit : number})
 
 ###################################################
 # STRINGS                                         #
@@ -820,6 +909,77 @@ def name_of_month(month, kind='full'):
         raise ValueError('Unrecognized kind: ' + str(kind))
 
     return names[month-1]
+
+
+################################################################
+# MISC                                                         #
+################################################################
+def decompose(times):
+    """Return integer components as dict.
+    
+        Parameters
+        ----------
+        times : None or dt.date or dt.time or iterable of such
+
+        Returns
+        -------
+        components : dict of int or None
+            keys: 'year', 'month', 'day', 'hour', 'minute', 'second',
+                    'microsecond'
+                
+        """
+    ############################################################
+    # just one time                                            #
+    ############################################################
+    if not isinstance(times, Iterable):
+        times = [time]
+        components = decompose(times)
+        for key in components:
+            components[key] = components[key][0]
+        return components
+
+    ############################################################
+    # iterable of times                                        #
+    ############################################################
+    init = False
+    Nt = len(times)
+    keys = ('year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond')
+
+    components = {}
+    for key in keys:
+        components[key] = [None] * Nt
+    
+    for nt, time in enumerate(times):
+        if time is None:
+            continue
+
+        if isinstance(time, dt.time):
+            components['hour'][nt] = time.hour
+            components['minute'][nt] = time.minute
+            components['second'][nt] = time.second
+            components['microsecond'][nt] = time.microsecond
+            continue
+
+        if isinstance(time, dt.date):
+            components['year'][nt] = time.year
+            components['month'][nt] = time.month
+            components['day'][nt] = time.day
+            continue
+
+        if isinstance(time, dt.datetime):
+            components['year'][nt] = time.year
+            components['month'][nt] = time.month
+            components['day'][nt] = time.day
+            components['microsecond'][nt] = time.microsecond
+            components['hour'][nt] = time.hour
+            components['minute'][nt] = time.minute
+            components['second'][nt] = time.second
+            components['microsecond'][nt] = time.microsecond
+            continue
+
+        raise TypeError('Cannot handle type %s' % type(time))
+
+    return components
 
 
 #        ********************************************
