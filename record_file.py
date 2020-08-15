@@ -40,7 +40,7 @@ class Record(object):
         if not isinstance(remove_multiple_appearances, bool):
             raise TypeError('remove_multiple_appearances must be str.')
 
-        self.filename = filename
+        self.filename = os.path.expanduser(filename)
         self.create_multiple_appearances = create_multiple_appearances
         self.remove_multiple_appearances = remove_multiple_appearances
         initialize(filename, overwrite=False)
@@ -83,6 +83,12 @@ class Record(object):
     def count_unique_entries(self):
         raise NotImplementedError()
 
+    def erase(self):
+        """Delete the record file if existant."""
+        if os.path.isfile(self.filename):
+            os.remove(self.filename)
+        return self
+
     def get_unique_entries(self):
         raise NotImplementedError()
 
@@ -96,6 +102,45 @@ class Record(object):
             lines = fid.readlines()
 
         return [line.strip() for line in lines]
+
+    def pop(self, index=-1):
+        """Remove and return item at index (default last).
+
+            Parameters
+            ----------
+            index : int, optional
+                (default: -1)
+            
+            Returns
+            -------
+            str : element at index position
+
+            Raises
+            ------
+            IndexError
+                record is empty or index is out of range.
+        """
+        # file does not exist
+        if not os.path.isfile(self.filename):
+            raise IndexError('pop from empty record')
+
+        # read file
+        with open(self.filename, 'r') as fid:
+            lines = fid.readlines()
+
+        # file empty
+        if not any(lines):
+            raise IndexError('pop from empty record')
+
+        # index out of range
+        L = len(lines)
+        if not -L <= index < L:
+            raise IndexError('pop index out of range')
+
+        # regular case
+        entry = lines[index]
+        self.remove(entry)
+        return entry
 
     def remove(self, entry):
         """Remove entry from record and return self."""
@@ -413,7 +458,7 @@ def test_write_and_look_up():
 
 def test_class_basic():
     import datetime as dt
-    filename = '.tempdir/.record_file.tmp.txt'
+    filename = '.record_file.tmp.txt'
     entries = ['first', 2, dt.datetime.now(), ('a', 'tuple')]
     record = Record(filename)
 
@@ -439,7 +484,7 @@ def test_class_basic():
         found = record.contains(entry)
         print('Entry %s in record file: %s' % (entry, found))
 
-    os.remove(filename)
+    record.erase()
 
 
 if __name__ == '__main__':

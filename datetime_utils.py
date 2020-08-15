@@ -1,4 +1,3 @@
-#!/usr/bin/python
 """A collection of functions that act on classes of the datetime module.
 
     Author
@@ -12,14 +11,16 @@
 
 # standard modules
 import calendar
-import collections
 import datetime as dt
+from collections import Iterable
 
 # PyPI modules
 import numpy as np
 
 # internal modules
-from .datetime_classes import DaytimePeriod, Season, Interval
+from . import timedelta
+from .datetime_intervals import Interval, DaytimePeriod, Season
+from .timedelta import MonthTimeDelta, YearTimeDelta
 
 ###################################################
 # range                                           #
@@ -80,7 +81,9 @@ def date_range(beg, end, inc=None, season_of_year=None):
     # convert to datetime.date objects
     return [t.date() for t in dtrange]
 
-def datetime_range(beg, end, inc, season_of_year=None, daytime_period=None):
+def datetime_range(
+        beg, end, inc=None, season_of_year=None, daytime_period=None,
+        ):
     """Return a list of dt.datetime. Works in analogy to range().
 
         The function works similar to the standard range() function and is
@@ -95,10 +98,11 @@ def datetime_range(beg, end, inc, season_of_year=None, daytime_period=None):
             inclusive
         end : dt.datetime
             exclusive
-        inc : dt.timedelta
+        inc : dt.timedelta, optional
+            Default: one day
         season_of_year : Season, optional
             Default: whole year
-        daytime_period : DaytimePeriod, optiona
+        daytime_period : DaytimePeriod, optional
             Default : whole day
 
         Tested
@@ -109,14 +113,47 @@ def datetime_range(beg, end, inc, season_of_year=None, daytime_period=None):
         -------
         2014       (AA): Created
         2017-12-30 (AA): Extention for inc < 0. Raise error on inc == 0.
+        2020-02-28 (AA): Set default for `inc` (1 day)
     """
     ###################################################
     # DEFAULT                                         #
     ###################################################
+    if inc is None:
+        inc = dt.timedelta(1)
+
     if season_of_year is None:
         season_of_year = Season(dt.datetime(1, 1, 1), dt.datetime(1, 1, 1))
+
     if daytime_period is None:
         daytime_period = DaytimePeriod(dt.time(), dt.time())
+
+    ############################################################
+    # MonthTimeDelta                                           #
+    ############################################################
+    if isinstance(inc, MonthTimeDelta):
+        times_raw = month_range(beg, end, inc.number)
+        times = []
+        for time in times_raw:
+            if time not in season_of_year:
+                continue
+            if time not in daytime_period:
+                continue
+            times.append(time)
+        return times
+
+    ############################################################
+    # YearTimeDelta                                            #
+    ############################################################
+    if isinstance(inc, YearTimeDelta):
+        times_raw = year_range(beg, end, inc.number)
+        times = []
+        for time in times_raw:
+            if time not in season_of_year:
+                continue
+            if time not in daytime_period:
+                continue
+            times.append(time)
+        return times
 
     ###################################################
     # INPUT CHECK                                     #
@@ -129,6 +166,7 @@ def datetime_range(beg, end, inc, season_of_year=None, daytime_period=None):
 
     if not isinstance(inc, dt.timedelta):
         raise TypeError('inc must be datetime.timedelta.')
+
     if inc == dt.timedelta():
         raise ValueError('inc must not be 0.')
 
@@ -191,11 +229,7 @@ def month_range(beg, end, inc=1):
     time = beg
     while time < end:
         times.append(time)
-        year = time.year
-        month = time.month
-        for i in range(inc):
-            year, month = next_month(year, month)
-        time = time.replace(year=year, month=month)
+        time = timedelta.add_months(time, inc)
 
     return times
 
@@ -228,10 +262,41 @@ def year_range(beg, end, inc=1):
     time = beg
     while time < end:
         times.append(time)
-        year = times.year
-        time = time.replace(year=year+inc)
+        time = timedelta.add_years(time, inc)
 
     return times
+
+def months_in_interval(interval):
+    """Return all overlapping months as list of Interval.
+
+        Parameters
+        ----------
+        interval : Interval
+
+        Returns
+        -------
+        months : list of Interval
+    """
+    time_beg = interval.start.replace(
+            day=1, hour=0, minute=0, second=0, microsecond = 0,
+            )
+    time_end = interval.end
+
+    months = []
+    for time_lo in month_range(time_beg, time_end):
+        time_hi = timedelta.add_months(time_lo)
+        month = Interval(time_lo, time_hi)
+        months.append(month)
+
+    # special case: time_end is exactly at the beginning of the month and
+    # inclusive
+    if interval.end_inclusive and (time_end not in months[-1]):
+        time_lo = time_end
+        time_hi = timedelta.add_months(time_lo)
+        month = Interval(time_lo, time_hi)
+        months.append(month)
+
+    return months
 
 
 ###################################################
@@ -279,7 +344,7 @@ def datetime_to_seconds(d, reference_date=dt.datetime(1970, 1, 1)):
         d = dt.datetime(d.year, d.month, d.day)
 
     # recursively call function:
-    if isinstance(d, collections.Iterable):
+    if isinstance(d, Iterable):
         if len(d) == 0:
             return []
         else:
@@ -328,7 +393,7 @@ def seconds_to_datetime(seconds, reference_date=dt.datetime(1970, 1, 1)):
     if ref.__class__ == dt.date:
         ref = dt.datetime(ref.year, ref.month, ref.day)
 
-    if isinstance(seconds, collections.Iterable):
+    if isinstance(seconds, Iterable):
         return [seconds_to_datetime(s, ref) for s in seconds]
 
     if np.isnan(seconds):
@@ -355,7 +420,7 @@ def julian_days_to_datetime(days):
         ------
         Moderately. Seems to be working but no guarantee.
     """
-    if isinstance(days, collections.Iterable):
+    if isinstance(days, Iterable):
         return([julian_days_to_datetime(d) for d in days])
     JD0 = 1721425.5  # Julian date of 1st Jan 1, 00:00
     return dt.datetime(1, 1, 1) + dt.timedelta(days=days - JD0)
@@ -371,7 +436,7 @@ def datetime_to_julian_days(time):
         -------
         float or array of such
     """
-    if isinstance(time, collections.Iterable):
+    if isinstance(time, Iterable):
         return np.array([datetime_to_julian_days(t) for t in time])
     JD0 = 1721425.5  # Julian date of 1st Jan 1, 00:00
     diff = (time - dt.datetime(1, 1, 1))
@@ -384,6 +449,10 @@ def datetime_to_julian_days(time):
 ###################################################
 # DAY OF YEAR                                     #
 ###################################################
+def day_of_year(*args, **kwargs):
+    """Alias to doy()."""
+    return doy(*args, **kwargs)
+
 def doy(date):
     """Return day of year and year as pair of ints.
 
@@ -406,7 +475,7 @@ def doy(date):
     ###################################################
     # RECURSIVE FUNCTION CALL FOR LISTS               #
     ###################################################
-    if isinstance(date, collections.Iterable):
+    if isinstance(date, Iterable):
         S = np.shape(date)
         assert len(S) == 1
         N = S[0]
@@ -452,7 +521,7 @@ def date_from_doy(doy, year):
     """
     return dt.date(year, 1, 1) + dt.timedelta(days=doy-1)
 
-def datetime_from_doy(doy, year):
+def datetime_from_doy(doy, year, hour=0, minute=0, second=0, microsecond=0):
     """Return a datetime.date.
 
         Parameters
@@ -469,7 +538,9 @@ def datetime_from_doy(doy, year):
         ----
         1st January is DOY 1 (not 0).
     """
-    return dt.datetime(year, 1, 1) + dt.timedelta(days=doy-1)
+    base = dt.datetime(year, 1, 1, hour, minute, second, microsecond)
+    increment = dt.timedelta(days=doy-1)
+    return base + increment
 
 def days_in_month(date):
     """Return the number of days of that month.
@@ -521,7 +592,7 @@ def sod_doy(time):
     ###################################################
     # RECURSIVE FUNCTION CALL FOR LISTS               #
     ###################################################
-    if isinstance(time, collections.Iterable):
+    if isinstance(time, Iterable):
         S = np.shape(time)
         assert len(S) == 1
         N = S[0]
@@ -548,97 +619,6 @@ def sod_doy(time):
     sec_of_day = (time - ref_sod).seconds + 1
     return sec_of_day, day_of_year, year
 
-
-###################################################
-# ITERATION                                       #
-###################################################
-def next_month(year, month):
-    """Return (year, month) of the following month.
-    
-        Parameters
-        ----------
-        year : int
-        month : int
-        
-        Returns
-        -------
-        year_next : int
-        month_next : int
-    """
-    if month < 12:
-        month += 1
-    else:
-        month = 1
-        year += 1
-    return year, month
-
-def previous_month(year, month):
-    """Return (year, month) of the previous month.
-    
-        Parameters
-        ----------
-        year : int
-        month : int
-        
-        Returns
-        -------
-        year_prev : int
-        month_prev : int
-    """
-    if month >= 1:
-        month -= 1
-    else:
-        month = 12
-        year -= 1
-    return year, month
-
-def next_day(year, month, day):
-    """Return (year, month, day) of the following day.
-    
-        Parameters
-        ----------
-        year : int
-        month : int
-        day : int
-        
-        Returns
-        -------
-        year_next : int
-        month_next : int
-        day_next : int
-    """
-    thisday = dt.datetime(year, month, day)
-    nextday = thisday + dt.timedelta(days=1)
-    y = nextday.year
-    m = nextday.month
-    d = nextday.day
-    return y, m, d
-
-def add_months(time, number=1):
-    """Increase by number of months."""
-    assert isinstance(time, dt.date)
-    assert isinstance(number, int)
-    number = int(number)
-    assert number >= 0
-
-    year = time.year
-    month = time.month
-    if number >= 0:
-        for n in range(number):
-            year, month = next_month(year, month)
-    else:
-        for n in range(number):
-            year, month = previous_month(year, month)
-    return time.replace(year=year, month=month)
-
-def add_years(time, number):
-    """Increase by number of years."""
-    assert isinstance(time, dt.date)
-    assert isinstance(number, int)
-    number = int(number)
-
-    year = time.year
-    return time.replace(year=year+number)
 
 
 ################################################################
@@ -726,7 +706,6 @@ def floor(time, comp='day', step=1):
 
     return time.replace(**kwargs)
 
-
 ###################################################
 # STRINGS                                         #
 ###################################################
@@ -773,23 +752,200 @@ def name_of_month(month, kind='full'):
 
     return names[month-1]
 
+def str_to_timedelta(words, enhanced=False):
+    if isinstance(words, str):
+        words = words.strip().replace('_', ' ').split()
+    
+    if len(words) == 1:
+        number = words[0]
+        unit = 'd'
+        string = number + ' ' + unit
+        return str_to_timedelta(string)
 
-#        ********************************************
-#        *                  TESTING                 *
-#        ********************************************
-if __name__ == "__main__":
-    beg = dt.datetime(2017, 1, 1)
-    end = dt.datetime(2017, 1, 2, 12, 3)
+    if len(words) != 2:
+        message = "Don't know how to interpret this as timedelta: %s" % string
+        raise ValueError(message)
 
-    t1 = dt.datetime(2017, 1, 2, 2)
-    t2 = dt.datetime(2017, 1, 4, 2)
-    t3 = dt.datetime(2016, 1, 2, 2)
+    try:
+        number = int(words[0])
+    except ValueError:
+        raise ValueError('Need int in first place, got %s' % number)
 
-    i = Interval(beg, end)
-    print(i)
-    print(i.length())
-    print(i.contains(t1))
-    print(i.contains(t2))
-    print(i.contains(t3))
-    print(repr(i))
+    unit = words[1]
 
+    aliases = {
+            'us' : 'microseconds',
+            'microsecond' : 'microseconds',
+            's' : 'seconds',
+            'sec' : 'seconds',
+            'secs' : 'seconds',
+            'min' : 'minutes',
+            'mins' : 'minutes',
+            'minute' : 'minutes',
+            'h' : 'hours',
+            'hour' : 'hours',
+            'd' : 'days',
+            'day' : 'days',
+            'mon' : 'months',
+            'month' : 'months',
+            'a' : 'years',
+            'year' : 'years',
+            'yr' : 'years',
+            'yrs' : 'years',
+            }
+
+    if unit in aliases:
+        unit = aliases[unit]
+
+    if enhanced and unit == 'months':
+        return MonthTimeDelta(number)
+
+    if enhanced and unit == 'years':
+        return YearTimeDelta(number)
+
+    return dt.timedelta(**{unit : number})
+
+def str_to_datetime(s, fmt=None):
+    """Return a dt.datetime.
+    
+        If input is insufficient, the function tries to guess smartly to
+        extend.
+
+        It understands 'now' and 'today'.
+
+        Parameters
+        ----------
+        s : str
+        fmt : str or None
+            The formatter
+
+        Returns
+        -------
+        datetime.datetime
+    """
+    if s is None:
+        return dt.datetime.now()
+
+    # check type
+    if isinstance(s, str):
+        pass
+    elif isinstance(s, Iterable):
+        return [str_to_datetime(ss, fmt) for ss in s]
+    else:
+        raise TypeError('Cannot convert type %s' % type(s))
+
+    # now
+    if s.lower() == 'now':
+        return dt.datetime.now()
+
+    # today
+    if s.lower() == 'today':
+        date = dt.date.today()
+        time = dt.time()
+        return dt.datetime.combine(date, time)
+
+    # try to guess formatter
+    if fmt is not None:
+        pass
+    elif len(s) == 8:
+        fmt = '%Y%m%d'
+    elif len(s) == 14:
+        fmt = '%Y%m%d%H%M%S'
+    elif les(s) == 15 and s[8] == '_':
+        fmt = '%Y%m%d_%H%M%S'
+    elif les(s) == 19:
+        fmt = (''
+                + '%Y' + s[4]
+                + '%m' + s[7]
+                + '%d' + s[10]
+                + '%H' + s[13]
+                + '%M' + s[16]
+                + '%S'
+                )
+    else:
+        raise ValueError('Unknown string format: %s' % s)
+
+    return dt.datetime.strptime(s, fmt)
+
+def timedelta_to_str(timedelta):
+    if isinstance(timedelta, MonthTimeDelta):
+        num = str(timedelta.number)
+        unit = 'month'
+        return num, unit
+    
+    if isinstance(timedelta, YearTimeDelta):
+        num = str(timedelta.number)
+        unit = 'a'
+        return num, unit
+    
+    raise NotImplementedError(type(timedelta))
+
+################################################################
+# MISC                                                         #
+################################################################
+def decompose(times):
+    """Return integer components as dict.
+    
+        Parameters
+        ----------
+        times : None or dt.date or dt.time or iterable of such
+
+        Returns
+        -------
+        components : dict of int or None
+            keys: 'year', 'month', 'day', 'hour', 'minute', 'second',
+                    'microsecond'
+                
+        """
+    ############################################################
+    # just one time                                            #
+    ############################################################
+    if not isinstance(times, Iterable):
+        times = [time]
+        components = decompose(times)
+        for key in components:
+            components[key] = components[key][0]
+        return components
+
+    ############################################################
+    # iterable of times                                        #
+    ############################################################
+    init = False
+    Nt = len(times)
+    keys = ('year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond')
+
+    components = {}
+    for key in keys:
+        components[key] = [None] * Nt
+    
+    for nt, time in enumerate(times):
+        if time is None:
+            continue
+
+        if isinstance(time, dt.time):
+            components['hour'][nt] = time.hour
+            components['minute'][nt] = time.minute
+            components['second'][nt] = time.second
+            components['microsecond'][nt] = time.microsecond
+            continue
+
+        if isinstance(time, dt.date):
+            components['year'][nt] = time.year
+            components['month'][nt] = time.month
+            components['day'][nt] = time.day
+            continue
+
+        if isinstance(time, dt.datetime):
+            components['year'][nt] = time.year
+            components['month'][nt] = time.month
+            components['day'][nt] = time.day
+            components['microsecond'][nt] = time.microsecond
+            components['hour'][nt] = time.hour
+            components['minute'][nt] = time.minute
+            components['second'][nt] = time.second
+            components['microsecond'][nt] = time.microsecond
+            continue
+
+        raise TypeError('Cannot handle type %s' % type(time))
+
+    return components

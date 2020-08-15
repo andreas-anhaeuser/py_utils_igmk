@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """Geometry functions.
 
     Author
@@ -15,6 +15,7 @@ import warnings
 
 # PyPI modules
 import numpy as np
+from shapely.geometry import Polygon
 
 # The spheroid values are from the World Geodetic System:
 _earth_radius       = 6.3710e6    # (m) Earth's mean radius
@@ -59,7 +60,7 @@ def distance_on_sphere(
         
         History
         -------
-        2018-12-01 : (AA) Extention to arrays of arbitrary shape
+        2018-12-01: (AA) Extention to arrays of arbitrary shape
         2014-2016 : (AA)
     """
     ###################################
@@ -324,117 +325,39 @@ def radius_on_spheroid(
     denominator = (a    * np.cos(phi))**2 + (b    * np.sin(phi))**2
     return np.sqrt(numerator / denominator)
 
-###################################################
-# DEPRECATED                                      #
-###################################################
-def distance_on_sphere_old(
-        longitude_1,
-        latitude_1,
-        longitude_2,
-        latitude_2,
-        units='deg',
-        radius=_earth_radius,
-        ):
-    """[Deprecated] Return distance between two points on a speherical surface.
-    
+def circular_polygon(x, y, radius, N=1024):
+    """Return a Polygon whose corners lie on a circle.
+
         Parameters
         ----------
-        longitude_1 : float
-        latitude_1 : float
-        longitude_2 : float or array
-        latitude_2 : float or array
-        units : str, optional
-            'deg' or 'rad', refers to the first four parameters, default is
-            'deg'.
-        sphere_radius : float or array, optional
-            radius of the sphere. Default: Earth radius in metres.
-
-        If longitude_2, latitude_2 and/or sphere_radius are given as an array,
-        they must all agree in their dimensions.
+        x : float
+            x-coordinate of the center
+        y : float
+            x-coordinate of the center
+        radius : float
+        N : int (positive)
+            number of corners
 
         Returns
         -------
-        float or array
-        
-        History
-        -------
-        2014-2016 : (AA)
+        shapely.Polygon
     """
-    ###################################
-    # INPUT CHECK                     #
-    ###################################
-    if not isinstance(units, str):
-        raise TypeError("units must be 'deg' oder 'rad'.")
-    if units.lower() not in ['deg', 'degrees', 'rad', 'radians']:
-        raise ValueError("units must be 'deg' oder 'rad'.")
+    N = int(N)
+    if N <= 0:
+        raise ValueError('N must be positve, got %s' % N)
 
-    ###################################
-    # CONVERSIONS                     #
-    ###################################
-    dr = np.pi / 180       # for conversion from deg to rad
-    if units.lower() in ['deg', 'degrees']:
-        lon1 = longitude_1 * dr
-        lat1 = latitude_1  * dr
-        lon2 = longitude_2 * dr
-        lat2 = latitude_2  * dr
-    else:
-        lon1 = longitude_1
-        lat1 = latitude_1
-        lon2 = longitude_2
-        lat2 = latitude_2
+    phi_inc = 2 * np.pi / N
+    phi_min = 0.
+    phi_max = 2 * np.pi
+    phis = np.arange(phi_min, phi_max, phi_inc)
 
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    
-    ###################################################
-    # NOMENCLATURE                                    #
-    ###################################################
-    # ds : central angle (i. e. separation angle between the points)
+    x_edge = x + radius * np.cos(phis)
+    y_edge = y + radius * np.sin(phis)
 
-    ########################################
-    # CASE: LARGE ANGULAR SEPARATION       #
-    ########################################
-    # This is the algebraically exact function but it causes considerable
-    # rounding errors for small angles. 
-    # ds is the central angle (i. e. separation angle between the points)
-    summand1 = np.sin(lat1) * np.sin(lat2)
-    summand2 = np.cos(lat1) * np.cos(lat2) * np.cos(dlon)
-    S = summand1 + summand2
+    points = zip(x_edge, y_edge)
+    polygon = Polygon(points)
+    return polygon
 
-    # numerical errors can lead to S > 1 (this is mathematically not possible,
-    # however)
-    if isinstance(S, collections.Iterable):
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', RuntimeWarning)
-            S[S > 1] = 1.
-    elif S > 1:
-         S = 1.
-    ds = np.arccos(S)
-
-    ########################################
-    # CASE: SMALL ANGULAR SEPARATION     #
-    ########################################
-    # for small central angles use haversine function (which avoids that
-    # rounding errors have large influence)
-    summand1 = (np.sin(dlat / 2.))**2
-    summand2 = np.cos(lat1) * np.cos(lat2) * (np.sin(dlon / 2.))**2
-    ds_hav = 2 * np.arcsin(np.sqrt(summand1 + summand2))
-        
-    ###################################################
-    # REPLACE ds BY ds_small IF ds IS SMALL           #
-    ###################################################
-    # If ds is array-like, change appropriate elements of ds (in this case,
-    # ds_is_small is a bool matrix). If ds is a scalar, then ds_is_small is a
-    # bool.
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore', RuntimeWarning)
-        ds_is_small = ds < 1e-3
-    if isinstance(ds, collections.Iterable):
-        ds[ds_is_small] = ds_hav[ds_is_small]
-    elif ds_is_small:
-        ds = ds_hav
-                
-    return radius * ds
 
 ###################################################
 # TESTING                                         #
@@ -476,5 +399,3 @@ if __name__ == '__main__':
     D = f()
     print(np.shape(D))
     print(D)
-   
-

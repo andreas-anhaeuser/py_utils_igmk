@@ -178,7 +178,6 @@ class Chronometer(object):
         self.info = str(info)
         self.set_item_name(item_name, item_plural)
         self.verbose = verbose
-        self.has_ever_been_shown = False
 
         # timers
         self.global_timer = Timer().start()
@@ -221,21 +220,12 @@ class Chronometer(object):
     def loop(self, loops=1):
         """Equivalent to self.increase_count(1)."""
         self.count += loops
-        return self
-
-    def skip_loop(self, loops=1):
-        """Decrease count and total_count."""
-        self.decrease_count(loops)
-        self.decrease_total_count(loops)
-        return self
 
     def show(self, usermessage=None, force=None, mode=None, wrap=True):
         """Update screen."""
-        self.use_builtin_print()
-
         # set force to True of False
         if force is None:
-            if not self.has_ever_been_shown:
+            if self.count < 2:
                 force = True
             elif usermessage is not None:
                 force = True
@@ -257,9 +247,8 @@ class Chronometer(object):
             wrap = self.get_wrap_length()
 
         if wrap and (usermessage is not None):
-            um_str = str(usermessage)
             lines = textwrap.wrap(
-                    um_str, int(wrap), break_on_hyphens=False,
+                    usermessage, int(wrap), break_on_hyphens=False,
                     )
             usermessage = ''.join([line + '\n' for line in lines])
 
@@ -267,8 +256,6 @@ class Chronometer(object):
 
         text = self.get_status_text(usermessage=usermessage, mode=mode)
         self.update_screen(text)
-
-        self.use_object_print()
 
         return self
 
@@ -285,62 +272,6 @@ class Chronometer(object):
         return self
 
     def print(self, text, *args, **kwargs):
-        """Issue a line of text and update screen."""
-        if 'file' in kwargs:
-            _builtin_print(text, *args, **kwargs)
-            return self
-
-        warnings.showwarning = _builtin_warning
-
-        # sep
-        sep = ' '
-        if 'sep' in kwargs:
-            sep = kwargs['sep']
-
-        # wrap
-        wrap = None
-        if 'wrap' in kwargs:
-            wrap = kwargs['wrap']
-
-        if wrap is None:
-            if self.file is None:
-                wrap = True
-            else:
-                wrap = False
-
-        # join arguments to one string
-        text = sep.join([str(arg) for arg in (text,) + args])
-
-        # wrap text ----------------------------------
-        if wrap:
-            if isinstance(wrap, bool):
-                wrap = self.get_wrap_length()
-
-            lines = textwrap.wrap(
-                text, wrap, break_on_hyphens=False
-                )
-        else:
-            lines = [text]
-
-        if len(lines) == 0:
-            lines = ['']
-        # --------------------------------------------
-
-        # paste0 --------------------------------------
-        for nline, line in enumerate(lines):
-            if nline == 0:
-                prefix = self.prefix_for_issue()
-            else:
-                prefix = ' ' * self.prefix_length()
-            self.update_screen(prefix + line)
-            self.Nlines_last_message = 0
-            self.show(force=True)
-        # --------------------------------------------
-        warnings.showwarning = self.custom_warning
-
-        return self
-
-    def print_old(self, text, *args, **kwargs):
         """Print time stamp and message."""
         if 'file' in kwargs:
             _builtin_print(text, *args, **kwargs)
@@ -405,29 +336,6 @@ class Chronometer(object):
         """Show an overview and clean up."""
         self.show(force=True, usermessage=usermessage, mode='resumee')
         self.exit()
-        return self
-
-    ################################################################
-    # pasters                                                      #
-    ################################################################
-    def paste(self, text):
-        """Print text as is to stdout or file."""
-        if self.file is None:
-            return self.paste_to_stdout(text)
-        return self.paste_to_file(text)
-
-    def paste_to_stdout(self, text):
-        """Print text as is to stdout."""
-        _builtin_print(text)
-        return self
-
-    def paste_to_file(self, text):
-        """Print text as is to file."""
-        self._initialize_file()
-        assert os.path.isfile(self.file)
-        with open(self.file, 'a') as fid:
-            # fid.write((text + '\n').encode('utf-8'))
-            fid.write(text + '\n')
         return self
 
     ############################################################
@@ -841,7 +749,6 @@ class Chronometer(object):
 
         # usermessage
         if usermessage is not None:
-            usermessage = str(usermessage)
             python_version = sys.version_info[0]    # (int)
             if python_version < 3:
                 usermessage = unicode(usermessage)
@@ -853,9 +760,7 @@ class Chronometer(object):
     def update_screen(self, text):
         self.delete_lines(self.Nlines_last_message)
         self.Nlines_last_message = text.count('\n') + 1
-        self.paste(text)
-        self.has_ever_been_shown = True
-        return self
+        self._print(text)
 
     def delete_lines(self, N=0):
         N = int(N)
@@ -866,7 +771,7 @@ class Chronometer(object):
 
         if self.file is None:
             deleter = N * (_UPWARD + _CLEARLINE) + _UPWARD
-            self.paste(deleter)
+            self._print(deleter)
         elif not os.path.isfile(self.file):
             pass
         else:
@@ -890,8 +795,6 @@ class Chronometer(object):
             return self
 
         dirname = os.path.dirname(self.file)
-        if dirname == '':
-            dirname = '.'
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
 
@@ -902,6 +805,34 @@ class Chronometer(object):
 
         return self
 
+    def _print(self, text):
+        #DEBUG
+        pr = _builtin_print
+        pr('self.file: %s' % self.file)
+
+        if self.file is None:
+            _builtin_print(text)
+        else:
+            pr('self.initalize_file')
+            self._initialize_file()
+            pr('assert file exists')
+            assert os.path.isfile(self.file)
+            pr('open(self.file)')
+            with open(self.file, 'a') as fid:
+                # fid.write((text + '\n').encode('utf-8'))
+                pr('write text to file: %s' % text)
+                pr('self.print (before): %s' % self.print)
+                p = self.print
+                builtin.print = _builtin_print
+                self.print = _builtin_print
+                pr('self.print (while): %s' % self.print)
+                fid.write(text + '\n')
+                builtin.print = p
+                self.print = p
+                pr('self.print (after): %s' % self.print)
+            pr('file closed')
+        return self
+
 class PerformanceInfo(Chronometer):
     """Alias to Chronometer."""
     pass
@@ -910,16 +841,18 @@ class PerformanceInfo(Chronometer):
 # helpers                                                       #
 #################################################################
 def get_screen_width(default=80):
-    if not sys.stdin.isatty():
-        return default
-
-    if not sys.stdout.isatty():
-        return default
-
+    pr = _builtin_print
+    print('Builtin print: %s' % pr)
+    pr('DEBUG [chrono] STTY')
     with os.popen('stty size', 'r') as fid:
         screen_size = fid.read().split()
+        pr('DEBUG [chrono]. Screen size: %s' % screen_size)
+        pr('DEBUG [chrono].  (type)    : %s' % type(screen_size))
+        pr('DEBUG [chrono]. default    : %s' % default)
         if len(screen_size) < 2:
             screen_width = default
         else:
             screen_width = int(screen_size[1])
+    print('DEBUG [chrono]. screen_width: %s' % screen_width)
+    pr('DEBUG [chrono]. screen_width: %s' % screen_width)
     return screen_width

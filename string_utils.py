@@ -1,11 +1,9 @@
 #!/usr/bin/python
-"""Functions for strings.
+"""String utils.
 
     Author
     ------
     Andreas Anhaeuser (AA) <andreas.anhaeuser@posteo.net>
-    Institute for Geophysics and Meteorology
-    University of Cologne, Germany
 """
 
 # standard modules
@@ -98,6 +96,9 @@ def human_format(num, digits=2, sep='', mode='prefix', type='float'):
     if np.isnan(num):
         return 'NaN'
 
+    if num == 0:
+        return '0'
+
     if np.isposinf(num):
         if mode == 'tex':
             return '$\\infty$'
@@ -185,6 +186,27 @@ def human_format(num, digits=2, sep='', mode='prefix', type='float'):
 
     return fmt % (num, prefix)
 
+def human_format_time(seconds):
+    """Return N.Mu or NNu or NNNu."""
+    value = seconds
+    units = 's'
+    if value > 300:
+        value /= 60
+        units = 'm'
+        if value > 300:
+            value /= 60
+            units = 'h'
+            if value > 100:
+                value /= 24
+                units = 'd'
+
+    if value >= 10:
+        fmt = '%1.0f'
+    else:
+        fmt = '%1.1f'
+
+    return fmt % value + units
+
 def percentage_string(fraction, sep=' '):
     """Return a str with a sensible number of digits.
         
@@ -242,42 +264,154 @@ def ordinal_str(number):
     return s + suffix
 
 ###################################################
+# COLOR FORMATTING                                #
+###################################################
+def highlighted_string_list(
+        words, n=None, sep='|', start_hl=_BOLD, end_hl=_ENDC,
+        index_error=False,
+        ):
+    """Return a string with one element highlighted.
+
+        Parameters
+        ----------
+        words : list of str
+        n : int or None
+            element to be highlighted. If None, no element will be highlighted.
+        sep : str, optional
+            separator between list elements
+        start_hl : str, optional
+            highlight string
+        end_hl : str, optional
+            un-highlight string
+        index_error : bool, optional
+            (default: False) raise error if n out of bounds
+
+        Returns
+        -------
+        str
+    """
+    # cast to str
+    words = [str(word) for word in words]
+
+    # highlight one elemnt
+    if n is not None:
+        if not isinstance(n, int):
+            raise TypeError('n must be int.')
+        try:
+            words[n] = start_hl + words[n] + end_hl
+        except IndexError as e:
+            if index_error:
+                raise e
+
+    # join list to str
+    line = sep.join(words)
+
+    return line
+
+###################################################
 # PROGRESS BAR                                    #
 ###################################################
-def progress_bar(fraction, length=79, fillcolor='', bgcolor=''):
-    """*Helper function. Return a nice progress bar as str. No '\n'."""
-    beg = _BOLD + u'\u2595' + _ENDC
-    end = _BOLD + u'\u258f' + _ENDC
+def progress_bar(
+        fraction, length=79, fillcolor='', bgcolor='', delim_color=_BOLD,
+        use_color=True,
+        ):
+    """Return a nice progress bar as str.
+
+        Parameters
+        ----------
+        fraction : float
+            fraction of bar to be filled, function optimized for
+            0 <= fraction <= 1, but works with other values, too.
+            Must be finite.
+        length : int > 2
+            full length of the progress bar including bounds
+        fillcolor : str, optional
+        bgcolor : str, optional
+        delim_color : str, optional
+        use_color : bool, optional
+
+        Returns
+        -------
+        str
+    """
+    # input check
+    # ===========================================================
+    if not np.isfinite(fraction):
+        raise ValueError('Need finite value, got %s' % fraction)
+
+    if not isinstance(length, int):
+        raise TypeError('length must be int, got %s' % type(length))
+    if length < 3:
+        raise ValueError('length must be larger than 2, got %s' % length)
+    # ===========================================================
+
+    if use_color:
+        endcolor = _ENDC
+    else:
+        endcolor = ''
+        fillcolor = ''
+        bgcolor = ''
+        delim_color=''
+
+    beg = delim_color + u'\u2595' + endcolor
+    end = delim_color + u'\u258f' + endcolor
 
     Nbar = length - 2
 
     # fraction > 1
     if fraction > 1:
-        left_inner = progress_bar_inner(fraction=1, length=Nbar,
-                fillcolor=fillcolor, bgcolor=bgcolor)
-        right_inner = progress_bar_inner(fraction=fraction-1, length=Nbar,
-                fillcolor=_YELLOW, bgcolor=bgcolor)
+        left_inner = progress_bar_inner(
+                fraction=1, length=Nbar, fillcolor=fillcolor, bgcolor=bgcolor,
+                use_color=use_color,
+                )
+        right_inner = progress_bar_inner(
+                fraction=fraction-1, length=Nbar, fillcolor=_YELLOW,
+                bgcolor=bgcolor, use_color=use_color,
+                )
         line = beg + left_inner + right_inner
         
     # fraction < 0
     elif fraction < 0:
-        return progress_bar(-fraction, length=length, fillcolor=_YELLOW)
+        return progress_bar(
+                -fraction, length=length, fillcolor=_YELLOW,
+                use_color=use_color,
+                )
 
     # 0 <= fraction <= 1 (regular case)
     else:
-        filling = progress_bar_inner(fraction, length=Nbar,
-                fillcolor=fillcolor, bgcolor=bgcolor)
+        filling = progress_bar_inner(
+                fraction, length=Nbar, fillcolor=fillcolor, bgcolor=bgcolor,
+                use_color=use_color,
+                )
         line = beg + filling + end 
 
     return line
 
-def progress_bar_inner(fraction, length=77, fillcolor='', bgcolor=''):
+def progress_bar_inner(
+        fraction, length=77, fillcolor='', bgcolor='', use_color=True,
+        ):
     """*Helper function."""
+    # input check
+    # =========================================================
+    if not isinstance(length, int):
+        raise TypeError('length must be int, got %s' % type(length))
+    if length < 1:
+        raise ValueError('length must be positive, got %s' % length)
+    # =========================================================
+
+
     # N : integers
     # F : float
     # full : number of (entirely) filled columns
     # blank : number of (entirely) clear columns
     Nbar = length
+
+    if not use_color:
+        fillcolor = ''
+        bgcolor = ''
+        endcolor = ''
+    else:
+        endcolor = _ENDC
 
     Ffull = fraction * Nbar
     Nfull = int(Ffull)
@@ -296,7 +430,7 @@ def progress_bar_inner(fraction, length=77, fillcolor='', bgcolor=''):
             Nfull * block_full + \
             block_frac + \
             Nblank * ' ' + \
-            _ENDC
+            endcolor
     return filling
 
 def get_frac_block(Neighths):
@@ -449,3 +583,32 @@ def clear_screen():
 def clear_line():
     """Return a str."""
     return _CLEARLINE
+
+################################################################
+# crop                                                         #
+################################################################
+def crop(s, word):
+    """Remove leading and trailing appearences of `word`."""
+    s = lcrop(s, word)
+    s = rcrop(s, word)
+    return s
+
+def lcrop(s, word):
+    """Remove leading appearences of `word`."""
+    if s == '':
+        return s
+
+    L = len(word)
+    while s.startswith(word):
+        s = s[L:]
+    return s
+
+def rcrop(s, word):
+    """Remove trailing appearences of `word`."""
+    if s == '':
+        return s
+
+    L = len(word)
+    while s.endswith(word):
+        s = s[:-L]
+    return s
