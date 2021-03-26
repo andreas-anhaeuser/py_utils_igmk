@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from . import chronometer
+from . import command_line
 from . import datetime_intervals
 from . import datetime_utils
 from . import filelock
@@ -21,5 +22,6 @@ from . import tables
 from . import timer
 from . import translation
 from . import units
+from . import unit_strings
 
 from .nelder_mead import nelder_mead
