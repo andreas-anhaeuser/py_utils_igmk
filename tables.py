@@ -674,7 +674,7 @@ def column_list(
         elif typ[j] == 'i':
             d = '1d'
         # string
-        elif typ[j] == 's':
+        elif typ[j] in 'cs':
             d = 's'
         else:
             raise NotImplementedError('')
@@ -690,7 +690,10 @@ def column_list(
         line = '\n'
         for j in range(J):
             # cast to string
-            word = fmts[j].format(data[j][n])
+            value = data[j][n]
+            if typ[j] == 'i':
+                value = int(value)
+            word = fmts[j].format(value)
 
             # add separator
             if j < J - 1:
