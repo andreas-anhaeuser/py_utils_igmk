@@ -34,6 +34,12 @@ class Interval(object):
         if isinstance(end, Iterable):
             end = dt.datetime(*end)
 
+        # convert date -> datetime
+        if type(start) == dt.date:
+            start = dt.datetime.combine(start, dt.time())
+        if type(end) == dt.date:
+            end = dt.datetime.combine(end, dt.time())
+
         # input check
         if not isinstance(start, dt.datetime):
             raise TypeError('`start` must be datetime.datetime.')
@@ -146,6 +152,10 @@ class Interval(object):
     def length(self):
         """Return a datetime.timedelta."""
         return self.end - self.start
+
+    def center(self):
+        """Return the center of the interval as datetime.time."""
+        return self.start + 0.5 * self.length()
 
     def get_bounds(self):
         """Return a pair of datetime.datetime."""
