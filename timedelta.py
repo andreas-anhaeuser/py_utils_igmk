@@ -46,7 +46,7 @@ class MonthTimeDelta():
             return True
 
         if isinstance(other, dt.timedelta):
-            other_days = other.total_seconds() * 86400.
+            other_days = get_total_days(other)
             if self.max_days() < other_days:
                 return False
             if self.min_days() > other_days:
@@ -74,7 +74,7 @@ class MonthTimeDelta():
             return self.days < other.days
 
         if isinstance(other, dt.timedelta):
-            other_days = other.total_seconds() * 86400.
+            other_days = get_total_days(other)
             if self.max_days() < other_days:
                 return True
             if self.min_days() > other_days:
@@ -102,7 +102,7 @@ class MonthTimeDelta():
             return self.days > other.days
 
         if isinstance(other, dt.timedelta):
-            other_days = other.total_seconds() * 86400.
+            other_days = get_total_days(other)
             if self.min_days() > other_days:
                 return True
             if self.max_days() < other_days:
@@ -130,7 +130,7 @@ class MonthTimeDelta():
             return self.days <= other.days
 
         if isinstance(other, dt.timedelta):
-            other_days = other.total_seconds() * 86400.
+            other_days = get_total_days(other)
             if self.max_days() < other_days:
                 return True
             if self.min_days() > other_days:
@@ -158,7 +158,7 @@ class MonthTimeDelta():
             return self.days >= other.days
 
         if isinstance(other, dt.timedelta):
-            other_days = other.total_seconds() * 86400.
+            other_days = get_total_days(other)
             if self.min_days() > other_days:
                 return True
             if self.max_days() < other_days:
@@ -192,7 +192,6 @@ class YearTimeDelta():
         self.number = number
         self.days = 0
 
-
     def __add__(self, other):
         if not isinstance(other, dt.date):
             raise TypeError('Cannot handle %s' % type(other))
@@ -224,7 +223,7 @@ class YearTimeDelta():
             return True
 
         if isinstance(other, dt.timedelta):
-            other_days = other.total_seconds() * 86400.
+            other_days = get_total_days(other)
             if self.max_days() < other_days:
                 return False
             if self.min_days() > other_days:
@@ -248,7 +247,7 @@ class YearTimeDelta():
             return self.days < other.days
 
         if isinstance(other, dt.timedelta):
-            other_days = other.total_seconds() * 86400.
+            other_days = get_total_days(other)
             if self.max_days() < other_days:
                 return True
             if self.min_days() > other_days:
@@ -272,7 +271,7 @@ class YearTimeDelta():
             return self.days > other.days
 
         if isinstance(other, dt.timedelta):
-            other_days = other.total_seconds() * 86400.
+            other_days = get_total_days(other)
             if self.min_days() > other_days:
                 return True
             if self.max_days() < other_days:
@@ -296,7 +295,7 @@ class YearTimeDelta():
             return self.days <= other.days
 
         if isinstance(other, dt.timedelta):
-            other_days = other.total_seconds() * 86400.
+            other_days = get_total_days(other)
             if self.max_days() < other_days:
                 return True
             if self.min_days() > other_days:
@@ -320,7 +319,7 @@ class YearTimeDelta():
             return self.days >= other.days
 
         if isinstance(other, dt.timedelta):
-            other_days = other.total_seconds() * 86400.
+            other_days = get_total_days(other)
             if self.min_days() > other_days:
                 return True
             if self.max_days() < other_days:
@@ -346,7 +345,7 @@ class YearTimeDelta():
         days_fractional = self.number * 365.24 + self.days
         return int(np.ceil(days_fractional))
 
-class EnhancedTimeDelta(dt.timedelta):
+class EnhancedTimeDelta(object):
     def __init__(
             self, days=0, seconds=0, microseconds=0, minutes=0, hours=0,
             weeks=0, years=0, months=0,
@@ -488,6 +487,13 @@ def add_years(time, number=1):
 
     return time.replace(year=year, day=day)
 
+
 ################################################################
-# strings                                                      #
+# helpers                                                      #
 ################################################################
+def get_total_days(x):
+    """Return total days of timedelta."""
+    if not isinstance(x, dt.timedelta):
+        raise TypeError(str(type(x)))
+
+    return x.total_seconds() / 86400.
