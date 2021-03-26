@@ -1,7 +1,7 @@
-#!/usr/bin/python3
-
-def call(f, *args, n=3, ignore_error=True, error_return_value=None,
-        report_error=True, reporter=print, **kwargs):
+def call(
+        f, *args, n=3, ignore_error=True, error_return_value=None,
+        report_error=True, reporter=print, **kwargs
+        ):
     """Try to call function for n times.
 
         If the function call raises an error, it is tried again; for `n` times.

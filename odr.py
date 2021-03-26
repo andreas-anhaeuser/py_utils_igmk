@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python3
 """Orthogonal (geometrical) linear regression example script.
 
     See also
@@ -18,14 +18,14 @@ import numpy as np
 import scipy.odr as odr
 import matplotlib.pyplot as plt
 
-import lib.aa_maths as mat
+from misc.math.linreg import lin_reg
 
 #======== SETUP ========#
-m_true = 1.1
-t_true = -.1
+m_true = 1.3
+t_true = -0.1
 xnoise = 0.2
 ynoise = 0.2
-N = 1000.
+N = 10**3
 #=======================#
 
 # create ideal data set
@@ -38,7 +38,7 @@ y = y + np.random.normal(0, ynoise, N)
 
 # vertical least square regression:
 # alternativeley, use:     a, b = 2, 0
-a, b, Da, Db, N = mat.lin_reg(x, y)
+a, b, Da, Db, N = lin_reg(x, y)
 
 # orthogonal least square regression:
 def f(beta, x):
@@ -55,14 +55,20 @@ m, t = output.beta                       # best estimate
 Dm, Dt = output.sd_beta                  # uncertainties
 
 # plot:
-text_title = 'TRUTH: m = %1.2f, t= %1.2f' % (m_true, t_true)
-text_vert = 'vertical: m = %1.2f (+-%1.2f), t = %1.2f (+-%1.2f)' % \
-        (a, Da, b, Db)
-text_orth = 'orthogonal: m = %1.2f (+-%1.2f), t = %1.2f (+-%1.2f)' % \
-        (m, Dm, t, Dt)
-plt.plot(x, y, 'k.')
+text_title = 'Orthogonal vs. vertical linear regression'
+text_truth = 'Truth: m = %1.2f, t= %1.2f' % (m_true, t_true)
+text_vert = (
+        'Vertical: m = %1.2f (+-%1.2f), t = %1.2f (+-%1.2f)'
+        % (a, Da, b, Db)
+        )
+text_orth = (
+        'Orthogonal: m = %1.2f (+-%1.2f), t = %1.2f (+-%1.2f)'
+        % (m, Dm, t, Dt)
+        )
+plt.plot(x, y, 'k.', label=text_truth)
 plt.plot(x, a * x + b, 'b-', label=text_vert)
 plt.plot(x, m * x + t, 'r-', label=text_orth)
 plt.legend(loc='upper left', fontsize=9)
 plt.title(text_title)
+plt.axis('square')
 plt.show()

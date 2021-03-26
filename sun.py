@@ -547,5 +547,3 @@ if __name__ == '__main__':
     diffs = [(sunrises[n] - times[n]).days for n in range(N)]
     plt.plot(times, sunrises)
     plt.show()
-
-

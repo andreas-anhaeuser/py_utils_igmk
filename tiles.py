@@ -53,6 +53,7 @@ class Tile(object):
         idx_x = slice(self.xmin, self.xmax)
         return (idx_y, idx_x)
 
+
 def get_tile_numbers(edge_size_y, edge_size_x, total_tile_number):
     """Return number of tiles in y- and x-direction.
 
