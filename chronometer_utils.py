@@ -4,8 +4,8 @@ import datetime as dt
 # PyPI modules
 import numpy as np
 
-# local modules
-from . import string_utils
+# misc
+from misc import string_utils
 
 ################################################################
 # chrono arithmetics                                           #

@@ -15,6 +15,8 @@
     2017-01-25 (AA): Changed layout
     2018-01-25 (AA): Updated docstring.
 """
+
+# future
 from __future__ import print_function
 
 # standard modules
@@ -26,6 +28,8 @@ import datetime as dt
 import inspect
 import textwrap
 import warnings
+
+# builtin
 if sys.version_info.major < 3:
     import __builtin__ as builtin
 else:
@@ -34,22 +38,21 @@ else:
 # PyPI modules
 import numpy as np
 
-# local modules
-if __name__ == '__main__':
-    import string_utils
-    from timer import Timer
-    import chronometer_utils as utils
-else:
-    from . import string_utils
-    from .timer import Timer
-    from . import chronometer_utils as utils
+# misc
+from misc import string_utils
+from misc.timer import Timer
 
-_builtin_print = copy(builtin.print)
-_builtin_warning = warnings.showwarning
+# internal
+from . import chronometer_utils as utils
+
 
 ###################################################
 # CONSTANTS                                       #
 ###################################################
+# builtins
+_builtin_print = copy(builtin.print)
+_builtin_warning = warnings.showwarning
+
 # column widths
 _col_width = [11] + [20] * 3
 
@@ -144,6 +147,7 @@ class Chronometer(object):
             self, total_count=1, time_step=None, header='', info='',
             show_message_times=True, file=None, print_colors=None,
             item_name='loop', item_plural=None, verbose=20,
+            silent=False,
             ):
         """Initialize.
 
@@ -177,8 +181,11 @@ class Chronometer(object):
         self.set_header(header)
         self.info = str(info)
         self.set_item_name(item_name, item_plural)
-        self.verbose = verbose
         self.has_ever_been_shown = False
+
+        # verbosity
+        self.verbose = verbose
+        self.set_silent(silent)
 
         # timers
         self.global_timer = Timer().start()
@@ -231,6 +238,9 @@ class Chronometer(object):
 
     def show(self, usermessage=None, force=None, mode=None, wrap=True):
         """Update screen."""
+        if self.silent:
+            return self
+
         self.use_builtin_print()
 
         # set force to True of False
@@ -614,6 +624,11 @@ class Chronometer(object):
             self.total_count = int(c)
         return self
 
+    def set_silent(self, silent=True):
+        self.silent = silent
+        if self.silent:
+            self.verbose = 100
+
     ###################################################
     # COUNT                                           #
     ###################################################
@@ -903,7 +918,7 @@ class Chronometer(object):
         return self
 
 class PerformanceInfo(Chronometer):
-    """Alias to Chronometer."""
+    """Alias to Chronometer for backward compatibility."""
     pass
 
 #################################################################
