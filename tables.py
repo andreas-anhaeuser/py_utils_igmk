@@ -21,7 +21,6 @@ import numpy as np
 
 # misc
 from misc.string_converters import string_to_number
-
 _str_delims = ('"', "'")
 
 def read_vartable(filename, sep='|', comment='#', ignore_str=' '):

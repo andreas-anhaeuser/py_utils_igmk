@@ -413,6 +413,51 @@ def highlighted_string_list(
     return line
 
 ###################################################
+# COLOR FORMATTING                                #
+###################################################
+def highlighted_string_list(
+        words, n=None, sep='|', start_hl=_BOLD, end_hl=_ENDC,
+        index_error=False,
+        ):
+    """Return a string with one element highlighted.
+
+        Parameters
+        ----------
+        words : list of str
+        n : int or None
+            element to be highlighted. If None, no element will be highlighted.
+        sep : str, optional
+            separator between list elements
+        start_hl : str, optional
+            highlight string
+        end_hl : str, optional
+            un-highlight string
+        index_error : bool, optional
+            (default: False) raise error if n out of bounds
+
+        Returns
+        -------
+        str
+    """
+    # cast to str
+    words = [str(word) for word in words]
+
+    # highlight one elemnt
+    if n is not None:
+        if not isinstance(n, int):
+            raise TypeError('n must be int.')
+        try:
+            words[n] = start_hl + words[n] + end_hl
+        except IndexError as e:
+            if index_error:
+                raise e
+
+    # join list to str
+    line = sep.join(words)
+
+    return line
+
+###################################################
 # PROGRESS BAR                                    #
 ###################################################
 def progress_bar(

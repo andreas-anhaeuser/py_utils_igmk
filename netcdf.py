@@ -49,6 +49,18 @@ def read_file(
             these are ignored, even if explicitly listed in `varnames`
         str_method : str
             (e. g. 'regular', 'utf8', ...)
+    """Return content of netcdf file in two dicts.
+
+        Parameters
+        ----------
+        filename : str
+            path to netcdf file
+        varnames : list of str, optional
+            if given, only these variables are loaded
+        ignore_varnames : list of str, optional
+            these are ignored, even if explicitly listed in `varnames`
+        str_method : str
+            (e. g. 'regular', 'utf8', ...)
 
         Returns
         -------
@@ -72,6 +84,7 @@ def read_file(
     data = {}
     meta = {}
 
+<<<<<<< HEAD
     varnames_load = varnames
 
     with Dataset(fn_long, 'r') as fid:
@@ -81,7 +94,25 @@ def read_file(
         meta['dimension_sizes'] = [dims[dim].size for dim in dims]
         
         cropper = helpers.get_cropper(fid, bounds)
+||||||| merged common ancestors
+    with Dataset(fn_long, 'r') as nc:
+        # create list of variable names to load
+        varnames_file = nc.variables.keys()
+        if varnames is not None:
+            varnames_load = varnames
+        else:
+            varnames_load = varnames_file
+=======
+    with Dataset(fn_long, 'r') as fid:
+        # create list of variable names to load
+        varnames_file = fid.variables.keys()
+        if varnames is not None:
+            varnames_load = varnames
+        else:
+            varnames_load = varnames_file
+>>>>>>> 414d5d43f8709fcbfc337667ff2a35f604a2523f
 
+<<<<<<< HEAD
         # create loading list if necessary
         if varnames_load is None:
             varnames_load = fid.variables.keys()
@@ -89,16 +120,53 @@ def read_file(
         # load variables
         # =================================================
         for varname in varnames_load:
+||||||| merged common ancestors
+        for vn in varnames_load:
+=======
+        for varname in varnames_load:
+>>>>>>> 414d5d43f8709fcbfc337667ff2a35f604a2523f
             # ignore
             if varname in ignore_varnames:
                 continue
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+            # variable not in file
+            if vn not in varnames_file:
+                raise IOError('Variable "%s" not in file %s.' % (vn, filename))
+
+=======
+            # variable not in file
+            if varname not in varnames_file:
+                raise IOError(
+                        'Variable "%s" not in file %s'
+                        % (varname, filename)
+                        )
+
+>>>>>>> 414d5d43f8709fcbfc337667ff2a35f604a2523f
             # load
+<<<<<<< HEAD
             meta[varname] = read_var_atts(fid, varname)
             data[varname] = read_var_value(
                     fid, varname, method=str_method, cropper=cropper,
                     )
         # =================================================
+||||||| merged common ancestors
+            vid = nc[vn]
+            data[vn] = vid[:]
+            attnames = vid.ncattrs()
+            meta[vn] = {}
+            for an in attnames:
+                meta[vn][an] = vid.getncattr(an)
+=======
+            data[varname] = read_variable(fid, varname, method=str_method)
+            vid = fid[varname]
+            attnames = vid.ncattrs()
+            meta[varname] = {}
+            meta[varname]['dimensions'] = vid.dimensions
+            for attname in attnames:
+                meta[varname][attname] = vid.getncattr(attname)
+>>>>>>> 414d5d43f8709fcbfc337667ff2a35f604a2523f
 
     return data, meta
 
@@ -143,6 +211,116 @@ def write_file_v2(data, meta, filename):
                     continue
                 value = attributes[attname]
                 vid.setncattr(attname, value)
+
+    return filename
+
+def select_variables(file_in, file_out, varnames):
+    """Create a copy with only selected variables.
+
+        Parameters
+        ----------
+        file_in : str or netCDF4.Dataset
+            name of input file or an opened netCDF4.Dataset of such
+        file_out : str or netCDF4.Dataset
+            name of ouput file or an opened netCDF4.Dataset of such
+        varname : list of str
+            variables to be copied
+
+        Returns
+        -------
+        None
+    """
+    # Open file_in
+    # ------------------------------------------------------
+    if not isinstance(file_in, Dataset):
+        # check type
+        if not isinstance(file_in, str):
+            message = (
+                'file_in must be a filename or netCDF4.Dataset'
+                + ', got %s' % file_in
+                )
+            raise TypeError(message)
+
+        # check if file exists
+        if not os.path.isfile(file_in):
+            raise OSError('Input file does not exist: %s' % file_in)
+
+        # call function recursively
+        with Dataset(file_in, 'r') as fi:
+            return select_variables(fi, file_out, varnames)
+
+    # If this line is reached, file_in is a Dataset
+    fi = file_in
+    # ------------------------------------------------------
+
+    # Open file_out
+    # ------------------------------------------------------
+    if not isinstance(file_out, Dataset):
+        # check type
+        if not isinstance(file_out, str):
+            message = (
+                'file_out must be a filename or netCDF4.Dataset'
+                + ', got %s' % file_out
+                )
+            raise TypeError(message)
+
+        # build directory
+        dirname = os.path.dirname(file_out)
+        if not os.path.isdir(dirname):
+            os.makedirs(dirname)
+
+        # call function recursively
+        data_model = fi.data_model
+        with Dataset(file_out, 'w', format=data_model) as fo:
+            return select_variables(fi, fo, varnames)
+
+
+            vid = fid.createVariable(varname, dtype, dimnames)
+            vid[:] = values
+
+            # attributes
+            attributes = meta[varname]
+            ignore_keys = ('dimensions', 'dtype')
+            for attname in attributes:
+                if attname in ignore_keys:
+                    continue
+                value = attributes[attname]
+                vid.setncattr(attname, value)
+
+    return filename
+
+def select_variables(file_in, file_out, varnames):
+    """Create a copy with only selected variables.
+
+        Parameters
+        ----------
+        file_in : str or netCDF4.Dataset
+            name of input file or an opened netCDF4.Dataset of such
+        file_out : str or netCDF4.Dataset
+
+            # attributes
+            attributes = meta[varname]
+            ignore_keys = ('dimensions', 'dtype')
+            for attname in attributes:
+                if attname in ignore_keys:
+                    continue
+                value = attributes[attname]
+                vid.setncattr(attname, value)
+
+    return filename
+
+def select_variables(file_in, file_out, varnames):
+    """Create a copy with only selected variables.
+
+        Parameters
+        ----------
+        file_in : str or netCDF4.Dataset
+            name of input file or an opened netCDF4.Dataset of such
+        file_out : str or netCDF4.Dataset
+            name of ouput file or an opened netCDF4.Dataset of such
+        varname : list of str
+            variables to be copied
+
 
     return filename
 
@@ -322,6 +500,276 @@ def cast(data, nctype, Nchar=64):
     """Cast value(s) into a format suitable for netcdf writing."""
     if nctype == 'c':
         return cast_string(data, Nchar)
+
+    # scalar handling:
+    if np.isscalar(data):
+        x = cast(np.array([data]), nctype)
+        return x[0]
+
+    if nctype == 'f':
+        return np.array(data, dtype=np.float32)
+
+    ###################################################
+    # INT TYPES                                       #
+    ###################################################
+    inttypes = {
+            'i8' : [np.int64, -2**64, 2**64 - 1],
+            'i'  : [np.int32, -2**31, 2**31 - 1],
+            'h'  : [np.uint16,     0, 2**16 - 1],
+            's'  : [np.int16, -2**15, 2**15 - 1],
+            }
+
+    found = False
+    for inttype in inttypes:
+        if nctype == inttype:
+            dtype = inttypes[inttype][0]
+            lo = inttypes[inttype][1]
+            hi = inttypes[inttype][2]
+            if lo < 0:
+                filler = lo
+            else:
+                filler = hi
+            x = np.round(data)
+            x[np.isnan(x)] = filler
+            assert np.min(x) >= lo,   'Value(s) too small for' + inttype
+            assert np.max(x) <= hi,   'Value(s) too large for' + inttype
+            found = True
+    assert found, 'could not find nctype ' + nctype
+    return np.array(x, dtype=dtype)
+
+def select_variables(file_in, file_out, varnames):
+    """Create a copy with only selected variables.
+
+        Parameters
+        ----------
+        file_in : str or netCDF4.Dataset
+            name of input file or an opened netCDF4.Dataset of such
+        file_out : str or netCDF4.Dataset
+            name of ouput file or an opened netCDF4.Dataset of such
+        varname : list of str
+            variables to be copied
+
+        Returns
+        -------
+        None
+    """
+    # Open file_in
+    # ------------------------------------------------------
+    if not isinstance(file_in, Dataset):
+        # check type
+        if not isinstance(file_in, str):
+            message = (
+                'file_in must be a filename or netCDF4.Dataset'
+                + ', got %s' % file_in
+                )
+            raise TypeError(message)
+
+        # check if file exists
+        if not os.path.isfile(file_in):
+            raise OSError('Input file does not exist: %s' % file_in)
+
+        # call function recursively
+        with Dataset(file_in, 'r') as fi:
+            return select_variables(fi, file_out, varnames)
+
+    # If this line is reached, file_in is a Dataset
+    fi = file_in
+    # ------------------------------------------------------
+
+    # Open file_out
+    # ------------------------------------------------------
+    if not isinstance(file_out, Dataset):
+        # check type
+        if not isinstance(file_out, str):
+            message = (
+                'file_out must be a filename or netCDF4.Dataset'
+                + ', got %s' % file_out
+                )
+            raise TypeError(message)
+
+        # build directory
+        dirname = os.path.dirname(file_out)
+        if not os.path.isdir(dirname):
+            os.makedirs(dirname)
+
+        # call function recursively
+        data_model = fi.data_model
+        with Dataset(file_out, 'w', format=data_model) as fo:
+            return select_variables(fi, fo, varnames)
+
+    # If this line is reached, file_out is a Dataset
+    fo = file_out
+    # ------------------------------------------------------
+
+    # global attributes
+    # ------------------------------------------------------
+    attributes = fi.ncattrs()
+    for attribute in attributes:
+        value = fi.getncattr(attribute)
+        fo.setncattr(attribute, value)
+    # ------------------------------------------------------
+
+    for varname in varnames:
+        if varname not in fi.variables:
+            continue
+
+        vi = fi.variables[varname]
+        dimensions = vi.dimensions
+        dtype= vi.dtype
+        attributes = vi.ncattrs()
+
+        # create dimensions
+        # ------------------------------------------------------
+        for dimension in dimensions:
+            if dimension in fo.dimensions:
+                continue
+
+            size = fi.dimensions[dimension].size
+            fo.createDimension(dimension, size)
+        # ------------------------------------------------------
+
+        # create variable
+        # ------------------------------------------------------
+        vo = fo.createVariable(varname, dtype, dimensions)
+        # ------------------------------------------------------
+
+        # create attributes
+        # ------------------------------------------------------
+        for attribute in attributes:
+            value = vi.getncattr(attribute)
+            vo.setncattr(attribute, value)
+        # ------------------------------------------------------
+
+        # copy data
+        # ------------------------------------------------------
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', RuntimeWarning)
+            vo[:] = vi[:]
+        # ------------------------------------------------------
+
+    return None
+
+
+################################################################
+# helpers - read                                               #
+################################################################
+def read_var_value(fid, varname, method='regular', cropper=None):
+    """Return one nc variable, strings already processed."""
+    # variable in file?
+    if varname not in fid.variables.keys():
+        filename = fid.name
+        raise IOError('Variable "%s" not in %s' % (varname, filename))
+    vid = fid.variables[varname]
+
+    # string
+    dtypes_str = ('c', 'S1')
+    if vid.dtype in dtypes_str:
+        return read_string_variable(fid, varname, method)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', RuntimeWarning)
+        if cropper is None:
+            values = vid[:]
+        else:
+            idx = helpers.get_crop_indices(vid, cropper)
+
+            values = vid[idx]
+    return values
+
+def read_var_atts(fid, varname):
+    """Return variable attributes as dict."""
+    vid = fid[varname]
+    attnames = vid.ncattrs()
+    atts = {}
+    atts['dimensions'] = vid.dimensions
+    atts['dtype'] = vid.dtype
+    for attname in attnames:
+        atts[attname] = vid.getncattr(attname)
+    return atts
+
+def read_string_variable(fid, varname, method='regular'):
+    """Convert netcdf char-array into a python string."""
+    raw = fid.variables[varname][:]
+    if method == 'regular':
+        return [x.tostring().decode().strip('\0') for x in raw]
+    elif method == 'utf8':
+        return [''.join([b.decode('UTF-8') for b in line]) for line in raw]
+    else:
+        raise ValueError('Unknown string type: %s' % method)
+
+################################################################
+# helpers - write                                              #
+################################################################
+def cast_string(data, Nchar=64, fill_char='\0'):
+    """Cast to a predefined length."""
+    assert isinstance(data, Iterable)
+
+    if not isinstance(data, str):
+        return [cast_string(word) for word in data]
+
+    return data[:Nchar].ljust(Nchar, fill_char)
+
+def cast(data, nctype, Nchar=64):
+    """Cast value(s) into a format suitable for netcdf writing."""
+    if nctype == 'c':
+        return cast_string(data, Nchar)
+
+    # scalar handling:
+    if np.isscalar(data):
+        x = cast(np.array([data]), nctype)
+        return x[0]
+
+    if nctype == 'f':
+        return np.array(data, dtype=np.float32)
+
+    ###################################################
+    # INT TYPES                                       #
+    ###################################################
+    inttypes = {
+            'i8' : [np.int64, -2**64, 2**64 - 1],
+            'i'  : [np.int32, -2**31, 2**31 - 1],
+            'h'  : [np.uint16,     0, 2**16 - 1],
+            's'  : [np.int16, -2**15, 2**15 - 1],
+            }
+
+    found = False
+    for inttype in inttypes:
+        if nctype == inttype:
+            dtype = inttypes[inttype][0]
+            lo = inttypes[inttype][1]
+            hi = inttypes[inttype][2]
+            if lo < 0:
+                filler = lo
+            else:
+                filler = hi
+            x = np.round(data)
+            x[np.isnan(x)] = filler
+            assert np.min(x) >= lo,   'Value(s) too small for' + inttype
+            assert np.max(x) <= hi,   'Value(s) too large for' + inttype
+            found = True
+    assert found, 'could not find nctype ' + nctype
+    return np.array(x, dtype=dtype)
+    if nctype == 'c':
+        return cast_string(data, Nchar)
+
+    # scalar handling:
+    if np.isscalar(data):
+        x = cast(np.array([data]), nctype)
+        return x[0]
+
+    if nctype == 'f':
+        return np.array(data, dtype=np.float32)
+
+    ###################################################
+    # INT TYPES                                       #
+    ###################################################
+    inttypes = {
+            'i8' : [np.int64, -2**64, 2**64 - 1],
+            'i'  : [np.int32, -2**31, 2**31 - 1],
+            'h'  : [np.uint16,     0, 2**16 - 1],
+            's'  : [np.int16, -2**15, 2**15 - 1],
+            }
+
 
     # scalar handling:
     if np.isscalar(data):

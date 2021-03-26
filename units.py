@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 def convert_to_si(value, units):
     factor = get_scale_factor(units)
     return value * factor
@@ -45,3 +46,14 @@ def get_scale_factor(units):
         return known_units[units]
 
     raise ValueError('Unknown units: %s' % units)
+||||||| merged common ancestors
+=======
+def get_scale_factor(units):
+    if units == 'm':
+        return 1.
+
+    if units == 'km':
+        return 1000.
+
+    raise ValueError('Unknown units: %s' % units)
+>>>>>>> 414d5d43f8709fcbfc337667ff2a35f604a2523f

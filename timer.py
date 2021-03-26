@@ -76,19 +76,15 @@ class Timer(object):
         self.first_started = dt.datetime.now()
         self.last_started = None
         self.name = name
-        if self.autostart:
-            self.start()
-
-    ############################################################
-    # CONTEXT MANAGEMENT                                       #
-    ############################################################
-    def __enter__(self):
-        return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Clean up."""
         if self.autoshow:
             self.show()
+||||||| merged common ancestors
+=======
+        self.name = name
+>>>>>>> 414d5d43f8709fcbfc337667ff2a35f604a2523f
 
     def __del__(self):
         pass

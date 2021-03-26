@@ -182,6 +182,34 @@ def datetime_range(
     season = season_of_year
     timeperiod = daytime_period
 
+    ############################################################
+    # MonthTimeDelta                                           #
+    ############################################################
+    if isinstance(inc, MonthTimeDelta):
+        times_raw = month_range(beg, end, inc.number)
+        times = []
+        for time in times_raw:
+            if time not in season:
+                continue
+            if time not in timeperiod:
+                continue
+            times.append(time)
+        return times
+
+    ############################################################
+    # YearTimeDelta                                            #
+    ############################################################
+    if isinstance(inc, YearTimeDelta):
+        times_raw = year_range(beg, end, inc.number)
+        times = []
+        for time in times_raw:
+            if time not in season:
+                continue
+            if time not in timeperiod:
+                continue
+            times.append(time)
+        return times
+
     ###################################################
     # BUILD LIST                                      #
     ###################################################

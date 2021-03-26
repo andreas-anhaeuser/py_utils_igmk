@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from . import bounds
 from . import points
 from . import coordinates

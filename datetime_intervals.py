@@ -28,6 +28,7 @@ class Interval(object):
             if `start` == `end`, the interval cannot be left-open and
             right-closed.
         """
+<<<<<<< HEAD:datetime_intervals.py
         # convert Iterable -> datetime
         if isinstance(start, Iterable):
             start = dt.datetime(*start)
@@ -40,6 +41,10 @@ class Interval(object):
         if type(end) == dt.date:
             end = dt.datetime.combine(end, dt.time())
 
+||||||| merged common ancestors
+    def __init__(self, start, end, start_inclusive=True, end_inclusive=False):
+=======
+>>>>>>> 414d5d43f8709fcbfc337667ff2a35f604a2523f:datetime_intervals.py
         # input check
         if not isinstance(start, dt.datetime):
             raise TypeError('`start` must be datetime.datetime.')
@@ -171,6 +176,7 @@ class Interval(object):
             return False
         return True
 
+<<<<<<< HEAD:datetime_intervals.py
     def is_continued_by(self, other):
         """Return True if other is a seamless continuation of self.
 
@@ -309,6 +315,146 @@ class Interval(object):
         end_inclusive = not other.start_inclusive
         return Interval(start, end, start_inclusive, end_inclusive)
 
+||||||| merged common ancestors
+=======
+    def is_continued_by(self, other):
+        """Return True if other is a seamless continuation of self.
+            
+            Returns True if and only if both these are True:
+            - `other` starts exactly where `self` ends
+            - the upper bound of `self` or the lower bound of `other` or both
+              are inclusive
+
+            Parameters
+            ----------
+            other : Interval
+
+            Returns
+            -------
+            bool
+        """
+        if self.end != other.start:
+            return False
+        if self.end_inclusive:
+            return True
+        if other.start_inclusive:
+            return True
+        return False
+
+    def is_addable_to(self, other):
+        """Return True if the intervals overlap or touch, False otherwise."""
+        if not isinstance(other, Interval):
+            raise TypeError('other must be Interval.')
+        if self.overlaps(other):
+            return True
+        if self.is_continued_by(other):
+            return True
+        if other.is_continued_by(self):
+            return True
+        return False
+
+    def is_subtractable(self, other):
+        """Return True if the intervals are subtractable, False, otherwise."""
+        if self._overhangs_left(other):
+            return True
+        if other._overhangs_left(self):
+            return True
+        return False
+
+    def intersect(self, other):
+        """Return the intersection interval.
+
+            The intersect exists if the intervals overlap.
+        """
+        if not isinstance(other, Interval):
+            raise TypeError('other must be Interval.')
+        if not self.overlaps(other):
+            message = 'Intervals do not overlap: %s, %s' % (self, other)
+            raise ValueError(message)
+
+        # start
+        if self.start == other.start:
+            start = self.start
+            start_inclusive = self.start_inclusive and other.start_inclusive
+        elif self.start > other.start:
+            start = self.start
+            start_inclusive = self.start_inclusive
+        else:
+            start = other.start
+            start_inclusive = other.start_inclusive
+
+        # end
+        if self.end == other.end:
+            end = self.end
+            end_inclusive = self.end_inclusive and other.end_inclusive
+        elif self.end < other.end:
+            end = self.end
+            end_inclusive = self.end_inclusive
+        else:
+            end = other.end
+            end_inclusive = other.end_inclusive
+
+        return Interval(
+                start=start, end=end,
+                start_inclusive=start_inclusive, end_inclusive=end_inclusive,
+                )
+
+    def add(self, other):
+        """Return the union interval."""
+        if not isinstance(other, Interval):
+            raise TypeError('other must be Interval.')
+        if not self.is_addable_to(other):
+            raise ValueError('Intervals not unitable: %s, %s' % (self, other))
+
+        # start
+        if self.start == other.start:
+            start = self.start
+            start_inclusive = self.start_inclusive or other.start_inclusive
+        elif self.start < other.start:
+            start = self.start
+            start_inclusive = self.start_inclusive
+        else:
+            start = other.start
+            start_inclusive = other.start_inclusive
+
+        # end
+        if self.end == other.end:
+            end = self.end
+            end_inclusive = self.end_inclusive or other.end_inclusive
+        elif self.end > other.end:
+            end = self.end
+            end_inclusive = self.end_inclusive
+        else:
+            end = other.end
+            end_inclusive = other.end_inclusive
+
+        return Interval(
+                start=start, end=end,
+                start_inclusive=start_inclusive, end_inclusive=end_inclusive,
+                )
+
+    def subtract(self, other):
+        """Return the difference interval."""
+        if not isinstance(other, Interval):
+            raise TypeError('other must be Interval.')
+        if not self.overlaps(other):
+            raise ValueError(
+                'Intervals do not overlap: %s, %s' % (self, other)
+                )
+
+        if other._overhangs_left(self):
+            return other.subtract(self)
+
+        if not self._overhangs_left(other):
+            raise ValueError('Result would not be and Interval.') 
+
+        start = self.start
+        start_inclusive = self.start_inclusive
+        start = other.start
+        end_inclusive = not other.start_inclusive
+        return Interval(start, end, start_inclusive, end_inclusive)
+
+>>>>>>> 414d5d43f8709fcbfc337667ff2a35f604a2523f:datetime_intervals.py
     ############################################################
     # helpers                                                  #
     ############################################################
@@ -684,6 +830,7 @@ class DaytimePeriod(object):
         return False
 
 
+
 class Season(object):
     """A section of the year cycle.
 
@@ -860,6 +1007,7 @@ class Season(object):
         bounds = interval.get_bounds()
         return cls(*bounds, allow_whole_year=allow_whole_year)
 
+<<<<<<< HEAD:datetime_intervals.py
     @classmethod
     def from_tuple(cls, beg, end, allow_whole_year=True):
         """Shorthand constructer using datetime args as tuples.
@@ -875,6 +1023,24 @@ class Season(object):
         dt_end = dt.datetime(1, *end)
         return cls(dt_beg, dt_end, allow_whole_year=allow_whole_year)
 
+||||||| merged common ancestors
+=======
+    @classmethod
+    def from_tuple(cls, beg, end, allow_whole_year=True):
+        """Shorthand constructer using datetime args as tuples.
+            
+            beg : tuple, length >= 2
+                interpreted as month, day, [hour, minute, second, microsecond]
+            end : tuple, length >= 2
+                interpreted as month, day, [hour, minute, second, microsecond]
+            allow_whole_day : bool or None
+                if None, True is assumed for intervals of finite length
+        """
+        dt_beg = dt.datetime(1, *beg)
+        dt_end = dt.datetime(1, *end)
+        return cls(dt_beg, dt_end, allow_whole_year=allow_whole_year)
+
+>>>>>>> 414d5d43f8709fcbfc337667ff2a35f604a2523f:datetime_intervals.py
     def __repr__(self):
         """Return a str."""
         return 'Season ' + str(self)

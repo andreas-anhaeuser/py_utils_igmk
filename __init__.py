@@ -7,6 +7,10 @@ from . import datetime_utils
 from . import filelock
 from . import fluids
 from . import geometry
+from . import datetime_utils
+from . import filelock
+from . import fluids
+from . import geometry
 from . import geodata
 from . import humidity
 from . import iso

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # PyPI
 import numpy as np
 

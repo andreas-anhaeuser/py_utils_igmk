@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # standard modules
 import datetime as dt
 
