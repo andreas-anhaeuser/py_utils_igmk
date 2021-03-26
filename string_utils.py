@@ -12,6 +12,9 @@ import sys
 # PyPI modules
 import numpy as np
 
+# misc
+from misc.math import round as round_utils
+
 ###################################################
 # COLORS                                          #
 ###################################################
@@ -82,12 +85,10 @@ def human_format(num, digits=2, sep='', mode='prefix', type='float'):
     ###################################################
     # INPUT CHECK                                     #
     ###################################################
-    valid_modes = ['prefix', 'power', 'tex']
     valid_types = ['float', 'int']
 
     assert isinstance(digits, int)
     assert isinstance(sep, str)
-    assert mode in valid_modes
     assert type in valid_types
 
     ###################################################
@@ -125,6 +126,19 @@ def human_format(num, digits=2, sep='', mode='prefix', type='float'):
         powers = range(0, 30, 3)
         P = ['\\times\, 10^{%1.0f}' % power for power in powers]
         p = ['\\times\, 10^{-%1.0f}' % power for power in powers]
+    elif mode in ('short scale', 'short_scale'):
+        P = [
+                '', 'thousand', 'million', 'billion', 'trillion',
+                'quadrillion', 'quintillion', 'sextillion', 'septillion'
+                ]
+        p = [
+                '', 'thousandth', 'millionth', 'billionth', 'trillionth',
+                'quadrillionth', 'quintillionth', 'sextillionth',
+                'septillionth'
+                ]
+    else:
+        raise ValueError('Unknown mode: %s' % mode)
+
 
     ###################################################
     # MAGNITUDE                                       #
@@ -262,6 +276,96 @@ def ordinal_str(number):
     else:
         suffix = 'th'
     return s + suffix
+
+def group_thousands(number, decimals=0, round_digits=False, sep=','):
+    """Return a str, where exponentials of 1000 are grouped.
+
+        Parameters
+        ----------
+        number : float or int
+            the number to be grouped
+        decimals : int >= 0, optional
+            Default: 0. Number of decimal places to display.
+        round_digits : bool or int, optional
+            Default: False. Number of significant (leading) digits to round.
+        sep : str, optional
+            Default: ','. Thousands separator
+
+        Returns
+        -------
+        str
+            e. g. 12,345,678.9
+    """
+    # Special cases: non-numeric values
+    # =====================================================
+    if np.isnan(number):
+        return 'NaN'
+    if number == np.inf:
+        return 'infinite'
+    if number == -np.inf:
+        return 'neg. infinite'
+    # =====================================================
+
+    assert decimals >= 0
+
+    # Negative
+    # =====================================================
+    if number < 0:
+        text = group_thousands(-number, decimals, sep)
+        return '-' + text
+    # =====================================================
+
+    # Fractional part
+    # =====================================================
+    if decimals == 0:
+        fractional_str = ''
+    else:
+        fractional = number % 1
+        fmt = '%1.' + str(int(decimals)) + 'f'
+        fractional_str = (fmt % fractional).lstrip('0')
+    # =====================================================
+
+    # Round
+    # =====================================================
+    if round_digits:
+        number = round_utils.round_digits(number, round_digits)
+    # =====================================================
+
+    # Integer part
+    # =====================================================
+    if int(number) == 0:
+        str_int = '0'
+    else:
+        factor = 1000
+        position = 1
+        str_ints = []
+        while number >= position:
+            value = number // position % factor
+            str_ints.append('%03i' % value)
+            position *= factor
+        str_int = sep.join(str_ints[::-1])
+
+    if number >= 1:
+        str_int = str_int.lstrip('0')
+    # =====================================================
+
+    # combine int and fractional parts
+    text = str_int + fractional_str
+
+    return text
+
+def leading_digits(number, ndigits=1, base=10, fmt='int'):
+    """Return as int."""
+    if base != 10:
+        message = 'Only base 10 implemented so far, got %s' % str(base)
+        raise NotImplementedError(message)
+
+    if number < 0:
+        return get_leading_digits(-number, ndigits, base)
+
+    exp = int(np.floor(np.log10(number)))
+    leaders = number // 10**(exp-(ndigits-1))
+    return int(leaders)
 
 ###################################################
 # COLOR FORMATTING                                #
