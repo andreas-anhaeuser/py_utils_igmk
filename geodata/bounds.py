@@ -1,12 +1,11 @@
 """Bounds utils."""
 
 # PyPI modules
-from shapely.geometry import Polygon
-from fiona.crs import from_epsg
 import geopandas as gp
+from shapely.geometry import Polygon
 
 def convert_bounds_to_gdf(bounds, crs=None):
-    """Try to convert the input to a GeoDataFrame.
+    """Convert the input to a GeoDataFrame.
 
         Paramters
         ---------
@@ -18,7 +17,7 @@ def convert_bounds_to_gdf(bounds, crs=None):
         crs : coordinate reference system, optional
             regular lonlat will be assumed as default
 
-            
+
         Returns
         -------
         bounds : GeoDataFrame
@@ -32,7 +31,6 @@ def convert_bounds_to_gdf(bounds, crs=None):
     # ------------------------------------------------
     if isinstance(bounds, gp.GeoSeries):
         if crs is None:
-            # crs = from_epsg(4326) 
             crs = 'epsg:4326'
 
         gdf = gp.GeoDataFrame(geometry=bounds)
@@ -48,7 +46,14 @@ def convert_bounds_to_gdf(bounds, crs=None):
 
     # limits -> Polygon
     # ------------------------------------------------
+    if len(bounds) != 4:
+        raise IndexError('bounds must be of length for, got %i' % len(bounds))
+
     xmin, ymin, xmax, ymax = bounds
+
+    if not (xmax >= xmin and ymax >= ymin):
+        raise ValueError('xmin, ymin, xmax, ymax : %s' % str(bounds))
+
     coordinates = (
             (xmin, ymin),
             (xmax, ymin),
@@ -59,11 +64,16 @@ def convert_bounds_to_gdf(bounds, crs=None):
     return convert_bounds_to_gdf(polygon)
 
 def convert_bounds_to_tuple(bounds):
+    """Return as (xmin, ymin, xmax, ymax)."""
     if isinstance(bounds, gp.GeoDataFrame):
-        return tuple(bounds.bounds.iloc[0])
+        return bounds.unary_union.bounds
+        # original code replaced on 2020-10-20:
+        # return tuple(bounds.bounds.iloc[0])
 
     if isinstance(bounds, gp.GeoSeries):
-        return tuple(bounds.bounds.iloc[0])
+        return bounds.unary_union.bounds
+        # original code replaced on 2020-10-20:
+        # return tuple(bounds.bounds.iloc[0])
 
     bounds = tuple(bounds)
     assert len(bounds) == 4
