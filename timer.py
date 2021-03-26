@@ -1,15 +1,14 @@
-#!/usr/bin/python
 """A type that measures elapsed time."""
 
 # standard modules
 import datetime as dt
 
-# local modules
-if __name__ == '__main__':
-    from string_utils import human_format
-else:
-    from .string_utils import human_format
+# misc
+from misc.string_utils import human_format
 
+################################################################
+# Main                                                         #
+################################################################
 class Timer(object):
     """Initialize stopped timer.
 
@@ -48,6 +47,13 @@ class Timer(object):
         >>> sleep(0.5)
         >>> print(timer)
     """
+    # class variables
+    autostart = False
+    autoshow = False
+
+    ############################################################
+    # INIT                                                     #
+    ############################################################
     def __init__(self, name=None):
         """Return self.
             
@@ -70,7 +76,26 @@ class Timer(object):
         self.first_started = dt.datetime.now()
         self.last_started = None
         self.name = name
+        if self.autostart:
+            self.start()
 
+    ############################################################
+    # CONTEXT MANAGEMENT                                       #
+    ############################################################
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Clean up."""
+        if self.autoshow:
+            self.show()
+
+    def __del__(self):
+        pass
+
+    ############################################################
+    # USER FUNCTIONS                                           #
+    ############################################################
     def __str__(self):
         """Return elapsed time as human readable string."""
         secs = self.get('s')
@@ -138,12 +163,14 @@ class Timer(object):
             ------
             AlreadyStoppedError
         """
-        if self.is_stopped():
-            if ignore_stopped:
-                return self
-            else:
-                message = 'Attempt to stop already stopped Timer.'
-                raise AlreadyStoppedError(message)
+        if not self.is_stopped():
+            pass
+
+        elif ignore_stopped:
+            return self
+
+        else:
+            raise AlreadyStoppedError('Attempt to stop already stopped Timer.')
 
         # regular case
         now = dt.datetime.now()
@@ -209,6 +236,9 @@ class Timer(object):
         return self
 
 
+################################################################
+# Exceptions                                                   #
+################################################################
 class TimerError(Exception):
     pass
 
@@ -217,12 +247,3 @@ class AlreadyRunningError(TimerError):
 
 class AlreadyStoppedError(TimerError):
     pass
-
-################################################################
-# testing                                                      #
-################################################################
-if __name__ == '__main__':
-    timer = Timer('timername')
-    timer.start().show()
-    timer.set(2).show()
-    timer.stop().show().reset().show()
