@@ -5,6 +5,10 @@ import warnings
 # PyPI modules
 import numpy as np
 
+# misc
+from misc.math.nearest_neighbour import nearest_neighbour
+# from misc.chronometer import Chronometer
+
 ################################################################
 # main                                                         #
 ################################################################
@@ -134,7 +138,7 @@ def running_mean_2d(
     if not len(y) == J:
         raise AssertionError('')
 
-    performance_info = PI(J, prefix='(ydir) ' + prefix)
+    performance_info = Chronometer(J, header='(ydir) ' + prefix)
     for j in range(J):
         if info_on_screen:
             performance_info.loop_and_show()
@@ -154,7 +158,7 @@ def running_mean_2d(
         else:
             meanx[:,j] = rm[0]
             
-    performance_info = PI(I, prefix='(xdir) ' + prefix)
+    performance_info = Chronometer(I, header='(xdir) ' + prefix)
     for i in range(I):
         if info_on_screen:
             performance_info.loop_and_show()
