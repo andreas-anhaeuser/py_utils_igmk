@@ -5,6 +5,7 @@ import os
 import affine
 from copy import deepcopy as copy
 import warnings
+from collections import Iterable
 
 # PyPI modules
 import numpy as np
@@ -15,14 +16,17 @@ import rasterio as rio
 from rasterio.mask import mask
 from pyproj import Proj
 
-# IGMK modules
+# misc
 from misc.geodata.bounds import convert_bounds_to_gdf
 from misc.math import running_mean
+
+# local
+from . import tiled_tif
 
 _data_key = 'data'
 
 def read(
-        filename, bounds, output_format='array', nan_thresh=None,
+        filename, bounds=None, output_format='array', nan_thresh=None,
         scale_factor=1, layer=0, data_key=None, Nx=None, Ny=None,
         crs=None,
         ):
@@ -61,7 +65,7 @@ def read(
         raise ValueError('Unknown output format: %s' % output_format)
 
 def read_as_gdf(
-        filename, bounds, nan_thresh=None, data_key=None, scale_factor=1,
+        filename, bounds=None, nan_thresh=None, data_key=None, scale_factor=1,
         Nx=None, Ny=None, layer=0, crs=None,
         ):
     """Return as GeoDataFrame."""
@@ -92,18 +96,17 @@ def read_as_gdf(
     gdf['geometry'] = [Point(xf[n], yf[n]) for n in range(N)]
     # =====================================================
 
-
     return gdf
 
 def read_as_array(
-        filename, bounds, nan_thresh=None, scale_factor=1, Nx=None, Ny=None,
-        layer=0, crs=None,
+        filename, bounds=None, nan_thresh=None, scale_factor=1, Nx=None,
+        Ny=None, layer=0, crs=None,
         ):
     """Return tif data as array and meta as dict.
 
         Parameters
         ----------
-        filename : str
+        filename : str or iterable of such
         bounds : GeoDataFrame
         nan_thresh : float
 
@@ -113,11 +116,61 @@ def read_as_array(
         meta : dict
             meta information
     """
+    # bounds
+    # ---------------------------------------
+    if bounds is None:
+        bounds = get_global_bounds()
+    bounds = convert_bounds_to_gdf(bounds)
+    # ---------------------------------------
+
+    # load raw
+    # ---------------------------------------
+    data, meta = load_file_raw(filename, bounds, layer)
+
+    # handle invalid numbers
+    # =====================================================
+    if nan_thresh is not None:
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', RuntimeWarning)
+            invalid = np.abs(data) > nan_thresh
+        data[invalid] = np.nan
+
+    # scale values
+    # ---------------------------------------
+    if scale_factor != 1:
+        data = np.array(data, dtype=float)
+        data *= scale_factor
+
+    # reduce resolution
+    # ---------------------------------------
+    data, meta = reduce_resolution(data, meta, Nx, Ny)
+
+    # crs
+    # ---------------------------------------
+    meta = change_crs(meta, crs)
+
+    return data, meta
+
+################################################################
+# helpers - load                                               #
+################################################################
+def load_file_raw(filename, bounds, layer=0):
+    """Return data as it is in the file."""
+    # tiled data
+    # =================================================
+    if not isinstance(filename, str):
+        if not isinstance(filename, Iterable):
+            raise TypeError(
+                    'filename must be str or iterable of such, got %s'
+                    % str(type(filename)),
+                    )
+
+        return tiled_tif.read_tiled_tif(filename, bounds)
+    # =================================================
+
     # filename ========================================
     if not os.path.isfile(filename):
         raise OSError('File does not exist: %s' % filename)
-
-    bounds = convert_bounds_to_gdf(bounds)
 
     # load data ===========================================
     with rio.open(filename, 'r') as fid:
@@ -145,35 +198,27 @@ def read_as_array(
             }
         )
 
-    # # raw coordinates
+    # raw coordinates
     # =====================================================
     x, y = compute_coordinates_from_transform(meta)
     meta['x_native'] = x
     meta['y_native'] = y
 
-    # handle invalid numbers
-    # =====================================================
-    if nan_thresh is not None:
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', RuntimeWarning)
-            invalid = np.abs(data) > nan_thresh
-        data[invalid] = np.nan
-
-    if scale_factor != 1:
-        data = np.array(data, dtype=float)
-        data *= scale_factor
-    # =====================================================
-
-    # resolution
-    data, meta = reduce_resolution(data, meta, Nx, Ny)
-
-    # crs
-    meta = change_crs(meta, crs)
-
     return data, meta
 
 ################################################################
-# helper functions                                             #
+# helpers - bounds                                             #
+################################################################
+def get_global_bounds():
+    xmin = -179.999999999999999999
+    xmax = 180.0
+    ymin = -90.0
+    ymax = 90.0
+    bounds = (xmin, ymin, xmax, ymax)
+    return bounds
+
+################################################################
+# helpers - misc                                               #
 ################################################################
 def change_crs(meta, crs=None, inplace=True):
     if not inplace:
