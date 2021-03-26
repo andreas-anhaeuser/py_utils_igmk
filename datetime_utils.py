@@ -208,23 +208,42 @@ def month_range(beg, end, inc=1):
 
         Parameters
         ----------
-        beg : dt.datetime
-            inclusive
+        beg : dt.datetime or int
+            inclusive. int is interpreted as year
         end : dt.datetime
-            exclusive
-        inc : int
+            exclusive. int is interpreted as year
+        inc : int > 0
             (months) increment
 
         History
         -------
+        2021-02-05 (AA): Implemented beg, end as int
         2019-02-07 (AA): Created
     """
-    assert isinstance(beg, dt.date)
-    assert isinstance(end, dt.date)
-    assert isinstance(inc, int)
-    inc = int(inc)
-    assert inc > 0
+    ############################################################
+    # cast                                                     #
+    ############################################################
+    if isinstance(beg, int):
+        beg = dt.date(beg, 1, 1)
+    if isinstance(end, int):
+        end = dt.date(end, 1, 1)
 
+    ############################################################
+    # input check                                              #
+    ############################################################
+    if not isinstance(beg, dt.date):
+        raise TypeError('`beg` must be int or dt.date, got %s' % type(beg))
+    if not isinstance(end, dt.date):
+        raise TypeError('`end` must be int or dt.date, got %s' % type(end))
+    if not isinstance(inc, int):
+        raise TypeError('`inc` must be int, got %s' % type(end))
+
+    if not inc > 0:
+        raise ValueError('`inc` must be positive, got %i' % inc)
+
+    ############################################################
+    # build list                                               #
+    ############################################################
     times = []
     time = beg
     while time < end:
@@ -554,6 +573,9 @@ def days_in_month(date):
         int
             number of days of that months.
     """
+    if not isinstance(date, int):
+        raise TypeError('`date` must be dt.date, got %s' % type(date))
+
     year = date.year
     month = date.month
     if month in [1, 3, 5, 7, 8, 10, 12]:
@@ -564,6 +586,30 @@ def days_in_month(date):
         return 29
     else:
         return 28
+
+def days_in_year(date):
+    """Return the number of days of that year.
+    
+        Parameters
+        ----------
+        date : dt.date or int
+            if int: the year
+        
+        Returns
+        -------
+        int
+            number of days of that months.
+    """
+    if isinstance(date, dt.date):
+        return days_in_year(date.year)
+
+    if not isinstance(date, int):
+        raise TypeError('`date` must be dt.date or int, got %s' % type(date))
+
+    year = date
+    if calendar.isleap(year):
+        return 366
+    return 365
 
 
 ###################################################
@@ -752,6 +798,136 @@ def name_of_month(month, kind='full'):
 
     return names[month-1]
 
+def name_of_weekday(weekday, Nchar=None):
+    """Return a str which represents the name of the month.
+
+        Parameters
+        ----------
+        month : int, between 1 and 12.
+            number of the month
+        kind : {'full', 'short', 'abbr'}, optional
+            'full' : return full month name
+            'short' : return the first 3-characters of the month name with no
+                      trailing '.'
+            'abbr' : return a max. 4-char str, Either the month name, if it is
+                     no longer than 4, otherwise its first 3 characters plus
+                     trailing '.'
+            Default : 'full'
+
+        Returns
+        -------
+        str
+            The month name.
+    """
+    assert isinstance(weekday, int)
+    assert 0 <= weekday < 7
+    if Nchar is not None:
+        assert isinstance(Nchar, int)
+        assert Nchar > 0
+
+    names = [
+            'Monday',
+            'Tuesday',
+            'Wednesday',
+            'Thursday',
+            'Friday',
+            'Saturday',
+            'Sunday',
+            ]
+    name = names[weekday]
+
+    # shorten name
+    if Nchar is not None:
+        name = name[:Nchar]
+
+    return name
+
+def str_to_datetime(s, fmt=None):
+    """Return a dt.datetime.
+    
+        If input is insufficient, the function tries to guess smartly to
+        extend.
+
+        It understands 'now' and 'today'.
+
+        Parameters
+        ----------
+        s : str
+        fmt : str or None
+            The formatter
+
+        Returns
+        -------
+        datetime.datetime
+    """
+    if s is None:
+        return dt.datetime.now()
+
+    # check type
+    if isinstance(s, str):
+        pass
+    elif isinstance(s, Iterable):
+        return [str_to_datetime(ss, fmt) for ss in s]
+    else:
+        raise TypeError('Cannot convert type %s' % type(s))
+
+    # now
+    if s.lower() == 'now':
+        return dt.datetime.now()
+
+    # today
+    if s.lower() == 'today':
+        date = dt.date.today()
+        time = dt.time()
+        return dt.datetime.combine(date, time)
+
+    # try to guess formatter
+    if fmt is not None:
+        pass
+    elif len(s) == 8:
+        fmt = '%Y%m%d'
+    elif len(s) == 10 and s[4] in ' -_':
+        gap = s[4]
+        fmt = '%Y' + gap + '%m' + gap + '%d'
+    elif len(s) == 14:
+        fmt = '%Y%m%d%H%M%S'
+    elif len(s) == 15 and s[8] == '_':
+        fmt = '%Y%m%d_%H%M%S'
+    elif len(s) == 19:
+        fmt = (''
+                + '%Y' + s[4]
+                + '%m' + s[7]
+                + '%d' + s[10]
+                + '%H' + s[13]
+                + '%M' + s[16]
+                + '%S'
+                )
+    else:
+        raise ValueError('Unknown string format: %s' % s)
+
+    return dt.datetime.strptime(s, fmt)
+
+def str_to_date(s, fmt=None):
+    """Return a dt.datetime.
+    
+        If input is insufficient, the function tries to guess smartly to
+        extend.
+
+        It understands 'now' and 'today'.
+
+        Parameters
+        ----------
+        s : str
+        fmt : str or None
+            The formatter
+
+        Returns
+        -------
+        datetime.date
+    """
+    datetime = str_to_datetime(s, fmt)
+    return datetime.date()
+
 def str_to_timedelta(words, enhanced=False):
     if isinstance(words, str):
         words = words.strip().replace('_', ' ').split()
@@ -805,69 +981,20 @@ def str_to_timedelta(words, enhanced=False):
 
     return dt.timedelta(**{unit : number})
 
-def str_to_datetime(s, fmt=None):
-    """Return a dt.datetime.
-    
-        If input is insufficient, the function tries to guess smartly to
-        extend.
+def timedelta_to_str(timedelta):
+    """Convert a timedelta to number, unit and return as str, str.
 
-        It understands 'now' and 'today'.
+        This function is aimes to be fully inverse to `str_to_timedelta`
 
         Parameters
         ----------
-        s : str
-        fmt : str or None
-            The formatter
+        timedelta : dt.timedelta or MonthTimeDelta or YearTimeDelta
 
         Returns
         -------
-        datetime.datetime
+        number : str
+        unit : str
     """
-    if s is None:
-        return dt.datetime.now()
-
-    # check type
-    if isinstance(s, str):
-        pass
-    elif isinstance(s, Iterable):
-        return [str_to_datetime(ss, fmt) for ss in s]
-    else:
-        raise TypeError('Cannot convert type %s' % type(s))
-
-    # now
-    if s.lower() == 'now':
-        return dt.datetime.now()
-
-    # today
-    if s.lower() == 'today':
-        date = dt.date.today()
-        time = dt.time()
-        return dt.datetime.combine(date, time)
-
-    # try to guess formatter
-    if fmt is not None:
-        pass
-    elif len(s) == 8:
-        fmt = '%Y%m%d'
-    elif len(s) == 14:
-        fmt = '%Y%m%d%H%M%S'
-    elif les(s) == 15 and s[8] == '_':
-        fmt = '%Y%m%d_%H%M%S'
-    elif les(s) == 19:
-        fmt = (''
-                + '%Y' + s[4]
-                + '%m' + s[7]
-                + '%d' + s[10]
-                + '%H' + s[13]
-                + '%M' + s[16]
-                + '%S'
-                )
-    else:
-        raise ValueError('Unknown string format: %s' % s)
-
-    return dt.datetime.strptime(s, fmt)
-
-def timedelta_to_str(timedelta):
     if isinstance(timedelta, MonthTimeDelta):
         num = str(timedelta.number)
         unit = 'month'
@@ -877,8 +1004,36 @@ def timedelta_to_str(timedelta):
         num = str(timedelta.number)
         unit = 'a'
         return num, unit
-    
-    raise NotImplementedError(type(timedelta))
+
+    if not isinstance(timedelta, dt.timedelta):
+        raise NotImplementedError(type(timedelta))
+
+    seconds = timedelta.total_seconds()
+    if seconds % 1 != 0:
+        raise NotImplementedError('Fractions of seconds not implemented.')
+
+    if seconds == 0:
+        return 0, 's'
+
+    units_and_factors = (
+            ('s', 1),
+            ('min', 60),
+            ('h', 3600),
+            ('d', 86400),
+            )
+
+    int_unit, int_factor = units_and_factors[0]
+
+    for unit, factor in units_and_factors:
+        if seconds % factor != 0:
+            break
+        int_unit = unit
+        int_factor = factor
+
+    int_number = int(seconds / int_factor)
+
+    return str(int_number), int_unit
+        
 
 ################################################################
 # MISC                                                         #
