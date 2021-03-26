@@ -40,7 +40,8 @@ def gdf_to_grid(
     if shape_x != shape_y:
         i_need = "target coords must have same shape"
         this_is = "got %s and %s" % (shape_x, shape_y)
-        raise ValueError(i_need + ', but ' + this_is)
+        message = (i_need + ', but ' + this_is).capitalize()
+        raise ValueError(message)
 
     ############################################################
     # main                                                     #
@@ -73,7 +74,7 @@ def gdf_to_grid(
                 }
         interpolator = interpolate.Rbf(*args, **kwargs)
         remapped = interpolator(target_x, target_y)
-    elif method == 'calpuff_devel':
+    elif method in ('calpuff_devel', 'crea'):
         N = len(source_values)
         weighted_sum = np.zeros_like(target_x)
         weights = np.zeros_like(target_x)
